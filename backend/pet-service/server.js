@@ -47,7 +47,7 @@ const tableName = process.env.DYNAMODB_TABLE || 'pet-hospital-pets';
 
 // Routes
 app.get('/health', (req, res) => {
-  res.status(200).json({ status: 'healthy' });
+  res.status(200).json({ status: 'unhealthy' });
 });
 
 // Get all pets
