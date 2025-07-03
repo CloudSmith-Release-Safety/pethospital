@@ -67,7 +67,7 @@ app.get('/pets', async (req, res) => {
 });
 
 // Get pet by ID
-app.get('/pets/:id', async (req, res) => {
+app.get('/petss/:id', async (req, res) => {
   try {
     const params = {
       TableName: tableName,
