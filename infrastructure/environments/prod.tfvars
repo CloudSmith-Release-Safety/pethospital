@@ -28,4 +28,4 @@ alarm_actions = []
 ok_actions = []
 
 # Git Repository Configuration
-git_repository_url = "https://github.com/CloudSmith-Agent-Beta/pethospital.git"
+git_repository_url = "https://github.com/CloudSmith-Release-Safety/pethospital.git"

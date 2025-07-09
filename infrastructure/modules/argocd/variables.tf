@@ -17,7 +17,7 @@ variable "prefix" {
 variable "git_repository_url" {
   description = "URL of the Git repository containing the application code"
   type        = string
-  default     = "https://github.com/CloudSmith-Agent-Beta/pethospital.git"
+  default     = "https://github.com/CloudSmith-Release-Safety/pethospital.git"
 }
 
 variable "cluster_endpoint" {

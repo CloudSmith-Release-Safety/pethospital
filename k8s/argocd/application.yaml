@@ -6,7 +6,7 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: https://github.com/CloudSmith-Agent-Beta/pethospital.git
+    repoURL: https://github.com/CloudSmith-Release-Safety/pethospital.git
     targetRevision: main
     path: k8s/overlays/dev
   destination:
