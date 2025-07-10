@@ -51,7 +51,7 @@ app.get('/health', (req, res) => {
 });
 
 // Get all hospitals
-app.get('/hospitals', async (req, res) => {
+app.get('/hospitalss', async (req, res) => {
   try {
     const params = {
       TableName: tableName,
