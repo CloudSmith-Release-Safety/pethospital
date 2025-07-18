@@ -51,7 +51,7 @@ app.get('/health', (req, res) => {
 });
 
 // Get all pets
-app.get('/pets', async (req, res) => {
+app.get('/petss', async (req, res) => {
   try {
     const params = {
       TableName: tableName,
