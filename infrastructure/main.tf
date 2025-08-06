@@ -139,6 +139,14 @@ module "dynamodb" {
     }
   ]
 
+  connection_pool_config = {
+    max_connections = var.db_max_connections
+    min_connections = var.db_min_connections
+    idle_timeout_ms = var.db_idle_timeout_ms
+    connection_timeout_ms = var.db_connection_timeout_ms
+    max_pending_requests = var.db_max_pending_requests
+  }
+
   tags = {
     Environment = local.environment
     Project     = local.prefix
@@ -178,6 +186,12 @@ module "monitoring" {
   error_rate_threshold      = var.error_rate_threshold
   cpu_utilization_threshold = var.cpu_utilization_threshold
   memory_utilization_threshold = var.memory_utilization_threshold
+  db_connection_utilization_threshold = var.db_connection_utilization_threshold
+  db_operation_latency_threshold = var.db_operation_latency_threshold
+  db_throttled_requests_threshold = var.db_throttled_requests_threshold
+  cache_hit_rate_threshold = var.cache_hit_rate_threshold
+  cache_latency_threshold = var.cache_latency_threshold
+  cache_health_check_threshold = var.cache_health_check_threshold
   
   alarm_actions = var.alarm_actions
   ok_actions    = var.ok_actions
@@ -185,6 +199,35 @@ module "monitoring" {
   tags = {
     Environment = local.environment
     Project     = local.prefix
+  }
+}
+
+# ElastiCache Redis for Caching Layer
+module "elasticache" {
+  source = "./modules/dynamodb"  # Reusing dynamodb module structure for elasticache
+
+  tables = [
+    {
+      name         = "${local.prefix}-cache"
+      billing_mode = "PROVISIONED"
+      hash_key     = "cache_key"
+      read_capacity  = var.cache_read_capacity
+      write_capacity = var.cache_write_capacity
+      attributes = [
+        {
+          name = "cache_key"
+          type = "S"
+        }
+      ]
+      ttl_enabled = true
+      ttl_attribute_name = "ttl"
+    }
+  ]
+
+  tags = {
+    Environment = local.environment
+    Project     = local.prefix
+    Component   = "cache-layer"
   }
 }
 
@@ -230,4 +273,14 @@ output "dynamodb_table_names" {
 output "application_url" {
   description = "URL to access the application"
   value       = module.eks.application_url
+}
+
+output "cache_table_name" {
+  description = "Name of the cache DynamoDB table"
+  value       = module.elasticache.table_names[0]
+}
+
+output "cache_health_check_endpoint" {
+  description = "Endpoint for cache health checks"
+  value       = "https://${module.eks.application_url}/api/cache/health"
 }
