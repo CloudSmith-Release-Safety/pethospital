@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Box, 
   Typography, 
@@ -19,79 +19,19 @@ import {
   MenuItem,
   Select,
   FormControl,
-  InputLabel
+  InputLabel,
+  CircularProgress,
+  Alert,
+  Snackbar
 } from '@mui/material';
 import { Link } from 'react-router-dom';
-
-// Mock data for insurance policies
-const mockInsurancePolicies = [
-  { 
-    id: 1, 
-    policyNumber: 'POL-2023-001',
-    petName: 'Max', 
-    petId: 1,
-    ownerName: 'John Doe',
-    provider: 'PetCare Insurance',
-    plan: 'Premium',
-    startDate: '2023-01-15',
-    endDate: '2024-01-14',
-    coverageAmount: 5000.00,
-    status: 'Active',
-    monthlyPremium: 45.00
-  },
-  { 
-    id: 2, 
-    policyNumber: 'POL-2023-002',
-    petName: 'Bella', 
-    petId: 2,
-    ownerName: 'Jane Smith',
-    provider: 'Animal Health Insurance',
-    plan: 'Basic',
-    startDate: '2023-03-20',
-    endDate: '2024-03-19',
-    coverageAmount: 3000.00,
-    status: 'Active',
-    monthlyPremium: 30.00
-  },
-  { 
-    id: 3, 
-    policyNumber: 'POL-2022-003',
-    petName: 'Charlie', 
-    petId: 3,
-    ownerName: 'Mike Brown',
-    provider: 'PetCare Insurance',
-    plan: 'Standard',
-    startDate: '2022-07-10',
-    endDate: '2023-07-09',
-    coverageAmount: 4000.00,
-    status: 'Expired',
-    monthlyPremium: 35.00
-  },
-];
-
-// Mock data for insurance providers
-const insuranceProviders = [
-  { id: 1, name: 'PetCare Insurance' },
-  { id: 2, name: 'Animal Health Insurance' },
-  { id: 3, name: 'VetGuard Insurance' },
-  { id: 4, name: 'PawProtect' }
-];
-
-// Mock data for insurance plans
-const insurancePlans = [
-  { id: 1, name: 'Basic', provider: 'PetCare Insurance', coverageAmount: 3000, monthlyPremium: 30 },
-  { id: 2, name: 'Standard', provider: 'PetCare Insurance', coverageAmount: 4000, monthlyPremium: 35 },
-  { id: 3, name: 'Premium', provider: 'PetCare Insurance', coverageAmount: 5000, monthlyPremium: 45 },
-  { id: 4, name: 'Basic', provider: 'Animal Health Insurance', coverageAmount: 3000, monthlyPremium: 30 },
-  { id: 5, name: 'Premium', provider: 'Animal Health Insurance', coverageAmount: 5000, monthlyPremium: 40 },
-  { id: 6, name: 'Standard', provider: 'VetGuard Insurance', coverageAmount: 4000, monthlyPremium: 38 },
-  { id: 7, name: 'Premium', provider: 'VetGuard Insurance', coverageAmount: 6000, monthlyPremium: 50 },
-  { id: 8, name: 'Basic', provider: 'PawProtect', coverageAmount: 2500, monthlyPremium: 25 },
-  { id: 9, name: 'Premium', provider: 'PawProtect', coverageAmount: 5500, monthlyPremium: 48 }
-];
+import axios from 'axios';
 
 const Insurance = () => {
-  const [policies, setPolicies] = useState(mockInsurancePolicies);
+  const [policies, setPolicies] = useState([]);
+  const [providers, setProviders] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [open, setOpen] = useState(false);
   const [newPolicy, setNewPolicy] = useState({
     petName: '',
@@ -100,12 +40,57 @@ const Insurance = () => {
     provider: '',
     plan: '',
     startDate: '',
-    endDate: '',
     coverageAmount: 0,
     monthlyPremium: 0
   });
   const [selectedProvider, setSelectedProvider] = useState('');
   const [availablePlans, setAvailablePlans] = useState([]);
+  const [loadingPlans, setLoadingPlans] = useState(false);
+  const [snackbar, setSnackbar] = useState({
+    open: false,
+    message: '',
+    severity: 'info'
+  });
+
+  // Fetch insurance policies
+  useEffect(() => {
+    const fetchPolicies = async () => {
+      setLoading(true);
+      try {
+        const response = await axios.get('/api/insurance');
+        setPolicies(response.data);
+        setError(null);
+      } catch (err) {
+        console.error('Error fetching insurance policies:', err);
+        setError('Failed to fetch insurance policies. Please try again later.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchPolicies();
+  }, []);
+
+  // Fetch insurance providers
+  useEffect(() => {
+    const fetchProviders = async () => {
+      try {
+        const response = await axios.get('/api/insurance/providers');
+        setProviders(response.data);
+      } catch (err) {
+        console.error('Error fetching insurance providers:', err);
+        // Fallback to mock data
+        setProviders([
+          { id: 1, name: 'PetCare Insurance' },
+          { id: 2, name: 'Animal Health Insurance' },
+          { id: 3, name: 'VetGuard Insurance' },
+          { id: 4, name: 'PawProtect' }
+        ]);
+      }
+    };
+
+    fetchProviders();
+  }, []);
 
   // Function to get status color
   const getStatusColor = (status) => {
@@ -129,6 +114,16 @@ const Insurance = () => {
     setOpen(false);
     setSelectedProvider('');
     setAvailablePlans([]);
+    setNewPolicy({
+      petName: '',
+      petId: '',
+      ownerName: '',
+      provider: '',
+      plan: '',
+      startDate: '',
+      coverageAmount: 0,
+      monthlyPremium: 0
+    });
   };
 
   const handleChange = (e) => {
@@ -139,7 +134,7 @@ const Insurance = () => {
     });
   };
 
-  const handleProviderChange = (e) => {
+  const handleProviderChange = async (e) => {
     const provider = e.target.value;
     setSelectedProvider(provider);
     setNewPolicy({
@@ -150,16 +145,37 @@ const Insurance = () => {
       monthlyPremium: 0
     });
     
-    // Filter plans for selected provider
-    const filteredPlans = insurancePlans.filter(plan => plan.provider === provider);
-    setAvailablePlans(filteredPlans);
+    // Fetch plans for selected provider
+    setLoadingPlans(true);
+    try {
+      const selectedProviderObj = providers.find(p => p.name === provider);
+      if (selectedProviderObj) {
+        const response = await axios.get(`/api/insurance/providers/${selectedProviderObj.id}/plans`);
+        setAvailablePlans(response.data);
+      }
+    } catch (err) {
+      console.error('Error fetching plans:', err);
+      // Fallback to mock data
+      const mockPlans = [
+        { id: 1, name: 'Basic', provider: 'PetCare Insurance', coverageAmount: 3000, monthlyPremium: 30 },
+        { id: 2, name: 'Standard', provider: 'PetCare Insurance', coverageAmount: 4000, monthlyPremium: 35 },
+        { id: 3, name: 'Premium', provider: 'PetCare Insurance', coverageAmount: 5000, monthlyPremium: 45 },
+        { id: 4, name: 'Basic', provider: 'Animal Health Insurance', coverageAmount: 3000, monthlyPremium: 30 },
+        { id: 5, name: 'Premium', provider: 'Animal Health Insurance', coverageAmount: 5000, monthlyPremium: 40 },
+        { id: 6, name: 'Standard', provider: 'VetGuard Insurance', coverageAmount: 4000, monthlyPremium: 38 },
+        { id: 7, name: 'Premium', provider: 'VetGuard Insurance', coverageAmount: 6000, monthlyPremium: 50 },
+        { id: 8, name: 'Basic', provider: 'PawProtect', coverageAmount: 2500, monthlyPremium: 25 },
+        { id: 9, name: 'Premium', provider: 'PawProtect', coverageAmount: 5500, monthlyPremium: 48 }
+      ];
+      setAvailablePlans(mockPlans.filter(plan => plan.provider === provider));
+    } finally {
+      setLoadingPlans(false);
+    }
   };
 
   const handlePlanChange = (e) => {
     const planName = e.target.value;
-    const selectedPlan = insurancePlans.find(
-      plan => plan.provider === selectedProvider && plan.name === planName
-    );
+    const selectedPlan = availablePlans.find(plan => plan.name === planName);
     
     if (selectedPlan) {
       setNewPolicy({
@@ -171,22 +187,41 @@ const Insurance = () => {
     }
   };
 
-  const handleSubmit = () => {
-    // Calculate end date (1 year from start date)
-    const startDate = new Date(newPolicy.startDate);
-    const endDate = new Date(startDate);
-    endDate.setFullYear(endDate.getFullYear() + 1);
-    
-    const policy = {
-      ...newPolicy,
-      id: policies.length + 1,
-      policyNumber: `POL-${new Date().getFullYear()}-${(policies.length + 1).toString().padStart(3, '0')}`,
-      endDate: endDate.toISOString().split('T')[0],
-      status: 'Active'
-    };
-    
-    setPolicies([...policies, policy]);
-    handleClose();
+  const handleSubmit = async () => {
+    try {
+      const response = await axios.post('/api/insurance', {
+        petId: newPolicy.petId,
+        petName: newPolicy.petName,
+        ownerName: newPolicy.ownerName,
+        provider: newPolicy.provider,
+        plan: newPolicy.plan,
+        startDate: newPolicy.startDate,
+        coverageAmount: newPolicy.coverageAmount,
+        monthlyPremium: newPolicy.monthlyPremium
+      });
+      
+      setPolicies([...policies, response.data]);
+      setSnackbar({
+        open: true,
+        message: 'Insurance policy created successfully',
+        severity: 'success'
+      });
+      handleClose();
+    } catch (err) {
+      console.error('Error creating policy:', err);
+      setSnackbar({
+        open: true,
+        message: 'Failed to create insurance policy. Please try again.',
+        severity: 'error'
+      });
+    }
+  };
+
+  const handleCloseSnackbar = () => {
+    setSnackbar({
+      ...snackbar,
+      open: false
+    });
   };
 
   return (
@@ -204,60 +239,80 @@ const Insurance = () => {
         </Button>
       </Box>
 
-      <TableContainer component={Paper}>
-        <Table>
-          <TableHead>
-            <TableRow>
-              <TableCell>Policy #</TableCell>
-              <TableCell>Pet/Owner</TableCell>
-              <TableCell>Provider</TableCell>
-              <TableCell>Plan</TableCell>
-              <TableCell>Coverage</TableCell>
-              <TableCell>Premium</TableCell>
-              <TableCell>Valid Until</TableCell>
-              <TableCell>Status</TableCell>
-              <TableCell>Actions</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {policies.map((policy) => (
-              <TableRow key={policy.id}>
-                <TableCell>{policy.policyNumber}</TableCell>
-                <TableCell>
-                  <Link to={`/pets/${policy.petId}`} style={{ textDecoration: 'none', color: 'inherit' }}>
-                    <Typography variant="body2" color="primary" sx={{ fontWeight: 'medium' }}>
-                      {policy.petName}
-                    </Typography>
-                  </Link>
-                  <Typography variant="body2" color="textSecondary">
-                    Owner: {policy.ownerName}
-                  </Typography>
-                </TableCell>
-                <TableCell>{policy.provider}</TableCell>
-                <TableCell>{policy.plan}</TableCell>
-                <TableCell>${policy.coverageAmount.toFixed(2)}</TableCell>
-                <TableCell>${policy.monthlyPremium.toFixed(2)}/month</TableCell>
-                <TableCell>{policy.endDate}</TableCell>
-                <TableCell>
-                  <Chip 
-                    label={policy.status} 
-                    color={getStatusColor(policy.status)} 
-                    size="small" 
-                  />
-                </TableCell>
-                <TableCell>
-                  <Button 
-                    variant="outlined" 
-                    size="small"
-                  >
-                    View
-                  </Button>
-                </TableCell>
+      {error && (
+        <Alert severity="error" sx={{ mb: 3 }}>
+          {error}
+        </Alert>
+      )}
+
+      {loading ? (
+        <Box sx={{ display: 'flex', justifyContent: 'center', my: 4 }}>
+          <CircularProgress />
+        </Box>
+      ) : (
+        <TableContainer component={Paper}>
+          <Table>
+            <TableHead>
+              <TableRow>
+                <TableCell>Policy #</TableCell>
+                <TableCell>Pet/Owner</TableCell>
+                <TableCell>Provider</TableCell>
+                <TableCell>Plan</TableCell>
+                <TableCell>Coverage</TableCell>
+                <TableCell>Premium</TableCell>
+                <TableCell>Valid Until</TableCell>
+                <TableCell>Status</TableCell>
+                <TableCell>Actions</TableCell>
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </TableContainer>
+            </TableHead>
+            <TableBody>
+              {policies.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={9} align="center">No insurance policies found</TableCell>
+                </TableRow>
+              ) : (
+                policies.map((policy) => (
+                  <TableRow key={policy.id}>
+                    <TableCell>{policy.policyNumber}</TableCell>
+                    <TableCell>
+                      <Link to={`/pets/${policy.petId}`} style={{ textDecoration: 'none', color: 'inherit' }}>
+                        <Typography variant="body2" color="primary" sx={{ fontWeight: 'medium' }}>
+                          {policy.petName}
+                        </Typography>
+                      </Link>
+                      <Typography variant="body2" color="textSecondary">
+                        Owner: {policy.ownerName}
+                      </Typography>
+                    </TableCell>
+                    <TableCell>{policy.provider}</TableCell>
+                    <TableCell>{policy.plan}</TableCell>
+                    <TableCell>${policy.coverageAmount.toFixed(2)}</TableCell>
+                    <TableCell>${policy.monthlyPremium.toFixed(2)}/month</TableCell>
+                    <TableCell>{policy.endDate}</TableCell>
+                    <TableCell>
+                      <Chip 
+                        label={policy.status} 
+                        color={getStatusColor(policy.status)} 
+                        size="small" 
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <Button 
+                        component={Link}
+                        to={`/insurance/${policy.id}`}
+                        variant="outlined" 
+                        size="small"
+                      >
+                        View
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      )}
 
       <Dialog open={open} onClose={handleClose} maxWidth="md" fullWidth>
         <DialogTitle>Add New Insurance Policy</DialogTitle>
@@ -291,25 +346,29 @@ const Insurance = () => {
                 onChange={handleProviderChange}
                 label="Insurance Provider"
               >
-                {insuranceProviders.map(provider => (
+                {providers.map(provider => (
                   <MenuItem key={provider.id} value={provider.name}>
                     {provider.name}
                   </MenuItem>
                 ))}
               </Select>
             </FormControl>
-            <FormControl fullWidth disabled={!selectedProvider}>
+            <FormControl fullWidth disabled={!selectedProvider || loadingPlans}>
               <InputLabel>Plan</InputLabel>
               <Select
                 value={newPolicy.plan}
                 onChange={handlePlanChange}
                 label="Plan"
               >
-                {availablePlans.map(plan => (
-                  <MenuItem key={plan.id} value={plan.name}>
-                    {plan.name}
-                  </MenuItem>
-                ))}
+                {loadingPlans ? (
+                  <MenuItem disabled>Loading plans...</MenuItem>
+                ) : (
+                  availablePlans.map(plan => (
+                    <MenuItem key={plan.id} value={plan.name}>
+                      {plan.name}
+                    </MenuItem>
+                  ))
+                )}
               </Select>
             </FormControl>
             <TextField
@@ -351,6 +410,16 @@ const Insurance = () => {
           </Button>
         </DialogActions>
       </Dialog>
+
+      <Snackbar 
+        open={snackbar.open} 
+        autoHideDuration={6000} 
+        onClose={handleCloseSnackbar}
+      >
+        <Alert onClose={handleCloseSnackbar} severity={snackbar.severity} sx={{ width: '100%' }}>
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 };
