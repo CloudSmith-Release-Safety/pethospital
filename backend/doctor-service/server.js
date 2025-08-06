@@ -4,6 +4,7 @@ const cors = require('cors');
 const AWS = require('aws-sdk');
 const { v4: uuidv4 } = require('uuid');
 const winston = require('winston');
+const jwt = require('jsonwebtoken');
 
 // Configure logger
 const logger = winston.createLogger({
@@ -39,6 +40,120 @@ app.use((req, res, next) => {
   next();
 });
 
+// Token configuration
+const tokenConfig = {
+  tokenSecret: process.env.TOKEN_SECRET || 'pet-hospital-secret-key',
+  issuer: 'pet-hospital-api',
+  audience: 'pet-hospital-clients'
+};
+
+// Authentication middleware
+const authenticate = (req, res, next) => {
+  // Skip authentication for health endpoint
+  if (req.path === '/health') {
+    return next();
+  }
+  
+  // Get token from header
+  const authHeader = req.headers.authorization;
+  
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Authentication required' });
+  }
+  
+  const token = authHeader.split(' ')[1];
+  
+  try {
+    const decoded = jwt.verify(token, tokenConfig.tokenSecret, {
+      issuer: tokenConfig.issuer,
+      audience: tokenConfig.audience
+    });
+    
+    // Check if it's an access token
+    if (decoded.tokenType !== 'access') {
+      return res.status(401).json({ error: 'Invalid token type' });
+    }
+    
+    // Add user info to request
+    req.user = {
+      userId: decoded.userId,
+      role: decoded.role
+    };
+    
+    // Session monitoring
+    const tokenAge = Math.floor((Date.now() / 1000) - decoded.iat);
+    const tokenExpiresIn = decoded.exp - Math.floor(Date.now() / 1000);
+    
+    // Add session info to response headers for monitoring
+    res.set('X-Session-Created', new Date(decoded.iat * 1000).toISOString());
+    res.set('X-Session-Expires', new Date(decoded.exp * 1000).toISOString());
+    res.set('X-Session-Age', `${tokenAge}s`);
+    res.set('X-Session-Remaining', `${tokenExpiresIn}s`);
+    
+    next();
+  } catch (error) {
+    logger.error('Token verification failed:', error.message);
+    return res.status(401).json({ error: 'Invalid or expired token' });
+  }
+};
+
+// Role-based authorization middleware
+const authorize = (allowedRoles) => {
+  return (req, res, next) => {
+    if (!req.user) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+    
+    if (!allowedRoles.includes(req.user.role)) {
+      return res.status(403).json({ error: 'Insufficient permissions' });
+    }
+    
+    next();
+  };
+};
+
+// Security audit logging middleware
+const auditLog = (req, res, next) => {
+  const requestId = Math.random().toString(36).substring(2, 15);
+  const start = Date.now();
+  
+  // Add request ID to response headers
+  res.set('X-Request-ID', requestId);
+  
+  // Log request
+  logger.info({
+    type: 'security_audit',
+    event: 'request_received',
+    requestId,
+    method: req.method,
+    path: req.path,
+    ip: req.ip,
+    userAgent: req.headers['user-agent'],
+    userId: req.user ? req.user.userId : 'unauthenticated'
+  });
+  
+  // Log response
+  res.on('finish', () => {
+    const duration = Date.now() - start;
+    logger.info({
+      type: 'security_audit',
+      event: 'request_completed',
+      requestId,
+      method: req.method,
+      path: req.path,
+      statusCode: res.statusCode,
+      duration: `${duration}ms`,
+      userId: req.user ? req.user.userId : 'unauthenticated'
+    });
+  });
+  
+  next();
+};
+
+// Apply middleware
+app.use(auditLog);
+app.use(authenticate);
+
 // Configure AWS
 const dynamoDB = new AWS.DynamoDB.DocumentClient({
   region: process.env.AWS_REGION || 'us-west-2',
@@ -51,7 +166,7 @@ app.get('/health', (req, res) => {
 });
 
 // Get all doctors
-app.get('/doctors', async (req, res) => {
+app.get('/doctors', authorize(['user', 'admin', 'vet']), async (req, res) => {
   try {
     const params = {
       TableName: tableName,
@@ -67,7 +182,7 @@ app.get('/doctors', async (req, res) => {
 });
 
 // Get doctor by ID
-app.get('/doctors/:id', async (req, res) => {
+app.get('/doctors/:id', authorize(['user', 'admin', 'vet']), async (req, res) => {
   try {
     const params = {
       TableName: tableName,
@@ -90,7 +205,7 @@ app.get('/doctors/:id', async (req, res) => {
 });
 
 // Create doctor
-app.post('/doctors', async (req, res) => {
+app.post('/doctors', authorize(['admin', 'vet']), async (req, res) => {
   try {
     const { firstName, lastName, specialization, hospitalId, email, phone, licenseNumber } = req.body;
     
@@ -107,6 +222,7 @@ app.post('/doctors', async (req, res) => {
       email: email || null,
       phone: phone || null,
       licenseNumber,
+      createdBy: req.user.userId,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
@@ -126,7 +242,7 @@ app.post('/doctors', async (req, res) => {
 });
 
 // Update doctor
-app.put('/doctors/:id', async (req, res) => {
+app.put('/doctors/:id', authorize(['admin', 'vet']), async (req, res) => {
   try {
     const { firstName, lastName, specialization, hospitalId, email, phone, licenseNumber } = req.body;
     
@@ -150,7 +266,7 @@ app.put('/doctors/:id', async (req, res) => {
       Key: {
         id: req.params.id,
       },
-      UpdateExpression: 'set firstName = :firstName, lastName = :lastName, specialization = :specialization, hospitalId = :hospitalId, email = :email, phone = :phone, licenseNumber = :licenseNumber, updatedAt = :updatedAt',
+      UpdateExpression: 'set firstName = :firstName, lastName = :lastName, specialization = :specialization, hospitalId = :hospitalId, email = :email, phone = :phone, licenseNumber = :licenseNumber, updatedBy = :updatedBy, updatedAt = :updatedAt',
       ExpressionAttributeValues: {
         ':firstName': firstName || existingDoctor.Item.firstName,
         ':lastName': lastName || existingDoctor.Item.lastName,
@@ -159,6 +275,7 @@ app.put('/doctors/:id', async (req, res) => {
         ':email': email || existingDoctor.Item.email,
         ':phone': phone || existingDoctor.Item.phone,
         ':licenseNumber': licenseNumber || existingDoctor.Item.licenseNumber,
+        ':updatedBy': req.user.userId,
         ':updatedAt': new Date().toISOString(),
       },
       ReturnValues: 'ALL_NEW',
@@ -174,7 +291,7 @@ app.put('/doctors/:id', async (req, res) => {
 });
 
 // Delete doctor
-app.delete('/doctors/:id', async (req, res) => {
+app.delete('/doctors/:id', authorize(['admin']), async (req, res) => {
   try {
     const params = {
       TableName: tableName,
@@ -198,7 +315,7 @@ app.delete('/doctors/:id', async (req, res) => {
 });
 
 // Get doctors by hospital
-app.get('/hospitals/:hospitalId/doctors', async (req, res) => {
+app.get('/hospitals/:hospitalId/doctors', authorize(['user', 'admin', 'vet']), async (req, res) => {
   try {
     const params = {
       TableName: tableName,

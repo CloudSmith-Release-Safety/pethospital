@@ -70,17 +70,45 @@ module "eks" {
 module "dynamodb" {
   source = "./modules/dynamodb"
 
+  prefix = local.prefix
   tables = [
     {
       name         = "${local.prefix}-pets"
       billing_mode = "PAY_PER_REQUEST"
       hash_key     = "id"
+      range_key    = "ownerName"
       attributes = [
         {
           name = "id"
           type = "S"
+        },
+        {
+          name = "ownerName"
+          type = "S"
+        },
+        {
+          name = "species"
+          type = "S"
+        },
+        {
+          name = "createdAt"
+          type = "S"
         }
       ]
+      global_secondary_indexes = [
+        {
+          name               = "SpeciesIndex"
+          hash_key           = "species"
+          range_key          = "createdAt"
+          projection_type    = "ALL"
+        }
+      ]
+      ttl_enabled = true
+      ttl_attribute_name = "expirationTime"
+      backup_config = {
+        enabled = true
+        retention_days = 14
+      }
     },
     {
       name         = "${local.prefix}-hospitals"
@@ -90,6 +118,26 @@ module "dynamodb" {
         {
           name = "id"
           type = "S"
+        },
+        {
+          name = "name"
+          type = "S"
+        },
+        {
+          name = "address"
+          type = "S"
+        }
+      ]
+      global_secondary_indexes = [
+        {
+          name               = "NameIndex"
+          hash_key           = "name"
+          projection_type    = "ALL"
+        },
+        {
+          name               = "AddressIndex"
+          hash_key           = "address"
+          projection_type    = "KEYS_ONLY"
         }
       ]
     },
@@ -101,6 +149,31 @@ module "dynamodb" {
         {
           name = "id"
           type = "S"
+        },
+        {
+          name = "hospitalId"
+          type = "S"
+        },
+        {
+          name = "specialization"
+          type = "S"
+        },
+        {
+          name = "lastName"
+          type = "S"
+        }
+      ]
+      global_secondary_indexes = [
+        {
+          name               = "HospitalIndex"
+          hash_key           = "hospitalId"
+          range_key          = "lastName"
+          projection_type    = "ALL"
+        },
+        {
+          name               = "SpecializationIndex"
+          hash_key           = "specialization"
+          projection_type    = "ALL"
         }
       ]
     },
@@ -112,6 +185,32 @@ module "dynamodb" {
         {
           name = "id"
           type = "S"
+        },
+        {
+          name = "petId"
+          type = "S"
+        },
+        {
+          name = "doctorId"
+          type = "S"
+        },
+        {
+          name = "visitDate"
+          type = "S"
+        }
+      ]
+      global_secondary_indexes = [
+        {
+          name               = "PetVisitsIndex"
+          hash_key           = "petId"
+          range_key          = "visitDate"
+          projection_type    = "ALL"
+        },
+        {
+          name               = "DoctorScheduleIndex"
+          hash_key           = "doctorId"
+          range_key          = "visitDate"
+          projection_type    = "ALL"
         }
       ]
     },
@@ -123,6 +222,31 @@ module "dynamodb" {
         {
           name = "id"
           type = "S"
+        },
+        {
+          name = "visitId"
+          type = "S"
+        },
+        {
+          name = "paymentStatus"
+          type = "S"
+        },
+        {
+          name = "billingDate"
+          type = "S"
+        }
+      ]
+      global_secondary_indexes = [
+        {
+          name               = "VisitBillingIndex"
+          hash_key           = "visitId"
+          projection_type    = "ALL"
+        },
+        {
+          name               = "PaymentStatusIndex"
+          hash_key           = "paymentStatus"
+          range_key          = "billingDate"
+          projection_type    = "ALL"
         }
       ]
     },
@@ -134,10 +258,57 @@ module "dynamodb" {
         {
           name = "id"
           type = "S"
+        },
+        {
+          name = "petId"
+          type = "S"
+        },
+        {
+          name = "provider"
+          type = "S"
+        },
+        {
+          name = "expirationDate"
+          type = "S"
         }
       ]
+      global_secondary_indexes = [
+        {
+          name               = "PetInsuranceIndex"
+          hash_key           = "petId"
+          projection_type    = "ALL"
+        },
+        {
+          name               = "ProviderIndex"
+          hash_key           = "provider"
+          range_key          = "expirationDate"
+          projection_type    = "ALL"
+        }
+      ]
+      ttl_enabled = true
+      ttl_attribute_name = "policyExpiration"
     }
   ]
+
+  backup_enabled = true
+  backup_retention_days = 30
+  
+  monitoring_config = {
+    enable_performance_insights = true
+    enable_query_logging = true
+    alarm_threshold_read_capacity = 70
+    alarm_threshold_write_capacity = 70
+    alarm_threshold_throttled_requests = 5
+  }
+  
+  rollback_config = {
+    enable_automatic_rollback = true
+    rollback_trigger_alarm_names = [
+      "${local.prefix}-pets-throttled-requests-alarm",
+      "${local.prefix}-visits-throttled-requests-alarm"
+    ]
+    max_rollback_attempts = 3
+  }
 
   tags = {
     Environment = local.environment
@@ -153,6 +324,7 @@ module "ecr" {
     "${local.prefix}-pet-service",
     "${local.prefix}-hospital-service",
     "${local.prefix}-doctor-service",
+    "${local.prefix}-auth-service",
     "${local.prefix}-billing-service",
     "${local.prefix}-insurance-service",
     "${local.prefix}-visit-service",
@@ -225,6 +397,16 @@ output "ecr_repository_urls" {
 output "dynamodb_table_names" {
   description = "Names of the created DynamoDB tables"
   value       = module.dynamodb.table_names
+}
+
+output "dynamodb_backup_vault" {
+  description = "Name of the DynamoDB backup vault"
+  value       = module.dynamodb.backup_vault_name
+}
+
+output "dynamodb_monitoring_alarms" {
+  description = "DynamoDB monitoring alarms"
+  value       = module.dynamodb.monitoring_alarms
 }
 
 output "application_url" {

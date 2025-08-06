@@ -1,7 +1,7 @@
 {
-  "name": "hospital-service",
+  "name": "auth-service",
   "version": "1.0.0",
-  "description": "Hospital management service for Pet Hospital",
+  "description": "Authentication service for Pet Hospital",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
@@ -15,9 +15,9 @@
     "cors": "^2.8.5",
     "dotenv": "^16.3.1",
     "jsonwebtoken": "^9.0.1",
+    "bcryptjs": "^2.4.3",
     "uuid": "^9.0.0",
-    "winston": "^3.10.0",
-    "unleash-client": "^3.18.1"
+    "winston": "^3.10.0"
   },
   "devDependencies": {
     "jest": "^29.6.4",
