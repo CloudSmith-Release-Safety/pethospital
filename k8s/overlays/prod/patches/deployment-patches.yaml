@@ -14,6 +14,16 @@ spec:
               value: "us-west-2"
             - name: DYNAMODB_TABLE
               value: "pet-hospital-pets"
+            - name: DB_CONNECTION_POOL_MAX
+              value: "500"
+            - name: DB_CONNECTION_POOL_MIN
+              value: "50"
+            - name: DB_CONNECTION_IDLE_TIMEOUT_MS
+              value: "60000"
+            - name: DB_CONNECTION_TIMEOUT_MS
+              value: "5000"
+            - name: DB_MAX_PENDING_REQUESTS
+              value: "1000"
           resources:
             limits:
               cpu: "1000m"
@@ -38,6 +48,16 @@ spec:
               value: "us-west-2"
             - name: DYNAMODB_TABLE
               value: "pet-hospital-hospitals"
+            - name: DB_CONNECTION_POOL_MAX
+              value: "500"
+            - name: DB_CONNECTION_POOL_MIN
+              value: "50"
+            - name: DB_CONNECTION_IDLE_TIMEOUT_MS
+              value: "60000"
+            - name: DB_CONNECTION_TIMEOUT_MS
+              value: "5000"
+            - name: DB_MAX_PENDING_REQUESTS
+              value: "1000"
           resources:
             limits:
               cpu: "1000m"
@@ -62,6 +82,16 @@ spec:
               value: "us-west-2"
             - name: DYNAMODB_TABLE
               value: "pet-hospital-doctors"
+            - name: DB_CONNECTION_POOL_MAX
+              value: "500"
+            - name: DB_CONNECTION_POOL_MIN
+              value: "50"
+            - name: DB_CONNECTION_IDLE_TIMEOUT_MS
+              value: "60000"
+            - name: DB_CONNECTION_TIMEOUT_MS
+              value: "5000"
+            - name: DB_MAX_PENDING_REQUESTS
+              value: "1000"
           resources:
             limits:
               cpu: "1000m"
