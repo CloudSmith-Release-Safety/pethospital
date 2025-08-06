@@ -38,6 +38,24 @@ variable "memory_utilization_threshold" {
   default     = 80
 }
 
+variable "db_connection_utilization_threshold" {
+  description = "Threshold for database connection utilization alarm in percentage"
+  type        = number
+  default     = 80
+}
+
+variable "db_operation_latency_threshold" {
+  description = "Threshold for database operation latency alarm in milliseconds"
+  type        = number
+  default     = 100
+}
+
+variable "db_throttled_requests_threshold" {
+  description = "Threshold for throttled database requests"
+  type        = number
+  default     = 10
+}
+
 variable "alarm_actions" {
   description = "List of ARNs to notify when alarm transitions to ALARM state"
   type        = list(string)
