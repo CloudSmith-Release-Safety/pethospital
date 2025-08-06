@@ -38,6 +38,42 @@ variable "memory_utilization_threshold" {
   default     = 80
 }
 
+variable "db_connection_utilization_threshold" {
+  description = "Threshold for database connection utilization alarm in percentage"
+  type        = number
+  default     = 80
+}
+
+variable "db_operation_latency_threshold" {
+  description = "Threshold for database operation latency alarm in milliseconds"
+  type        = number
+  default     = 100
+}
+
+variable "db_throttled_requests_threshold" {
+  description = "Threshold for throttled database requests"
+  type        = number
+  default     = 10
+}
+
+variable "cache_hit_rate_threshold" {
+  description = "Threshold for cache hit rate alarm in percentage"
+  type        = number
+  default     = 70
+}
+
+variable "cache_latency_threshold" {
+  description = "Threshold for cache latency alarm in milliseconds"
+  type        = number
+  default     = 50
+}
+
+variable "cache_health_check_threshold" {
+  description = "Number of consecutive health check failures before triggering alarm"
+  type        = number
+  default     = 3
+}
+
 variable "alarm_actions" {
   description = "List of ARNs to notify when alarm transitions to ALARM state"
   type        = list(string)

@@ -1,0 +1,79 @@
+name: Cache Layer Validation
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'infrastructure/**'
+      - 'backend/**'
+      - 'k8s/**'
+  push:
+    branches: [ main ]
+    paths:
+      - 'infrastructure/**'
+      - 'backend/**'
+      - 'k8s/**'
+
+jobs:
+  validate-cache:
+    name: Validate Cache Layer
+    runs-on: ubuntu-latest
+    environment: ${{ github.event_name == 'push' && 'production' || 'staging' }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Set up environment variables
+        run: |
+          echo "CACHE_ENDPOINT=${{ secrets.CACHE_ENDPOINT }}" >> $GITHUB_ENV
+          echo "MIN_HIT_RATE=${{ vars.CACHE_MIN_HIT_RATE || '70' }}" >> $GITHUB_ENV
+          echo "MAX_LATENCY=${{ vars.CACHE_MAX_LATENCY || '50' }}" >> $GITHUB_ENV
+      
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y bc curl
+      
+      - name: Validate cache health
+        run: |
+          ./validate-cache.sh "$CACHE_ENDPOINT" 5 3 "$MIN_HIT_RATE" "$MAX_LATENCY"
+      
+      - name: Validate cache fallback mechanism
+        run: |
+          # Test fallback by simulating cache failure
+          FALLBACK_TEST_RESULT=$(curl -s -m 5 "$CACHE_ENDPOINT/fallback/simulate-failure")
+          if [[ "$FALLBACK_TEST_RESULT" != *"success"* ]]; then
+            echo "❌ Cache fallback mechanism failed"
+            exit 1
+          else
+            echo "✅ Cache fallback mechanism working correctly"
+          fi
+      
+      - name: Validate cache performance
+        run: |
+          # Run performance test
+          PERF_TEST_RESULT=$(curl -s -m 30 "$CACHE_ENDPOINT/performance-test")
+          if [[ "$PERF_TEST_RESULT" != *"success"* ]]; then
+            echo "❌ Cache performance test failed"
+            exit 1
+          else
+            echo "✅ Cache performance test passed"
+          fi
+      
+      - name: Notify on failure
+        if: failure()
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const issue_number = context.issue.number;
+            if (issue_number) {
+              github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issue_number,
+                body: '❌ Cache validation failed. Please check the workflow logs for details.'
+              });
+            }
