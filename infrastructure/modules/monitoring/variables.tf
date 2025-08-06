@@ -38,6 +38,18 @@ variable "memory_utilization_threshold" {
   default     = 80
 }
 
+variable "feature_flag_latency_threshold" {
+  description = "Threshold for feature flag evaluation latency in milliseconds"
+  type        = number
+  default     = 50
+}
+
+variable "feature_flag_error_threshold" {
+  description = "Threshold for feature flag evaluation errors"
+  type        = number
+  default     = 10
+}
+
 variable "alarm_actions" {
   description = "List of ARNs to notify when alarm transitions to ALARM state"
   type        = list(string)
