@@ -39,6 +39,71 @@ app.use((req, res, next) => {
   next();
 });
 
+// Enhanced error handling middleware
+const handleApiError = (error, req, res, next) => {
+  const timestamp = new Date().toISOString();
+  const requestId = req.headers['x-request-id'] || uuidv4();
+  
+  logger.error('API Error:', {
+    error: error.message,
+    code: error.code,
+    requestId,
+    path: req.path,
+    method: req.method,
+    stack: error.stack
+  });
+  
+  // DynamoDB specific errors
+  if (error.code === 'ResourceNotFoundException') {
+    return res.status(404).json({
+      error: 'Resource not found',
+      message: 'The requested hospital was not found',
+      requestId,
+      timestamp
+    });
+  }
+  
+  if (error.code === 'ValidationException') {
+    return res.status(400).json({
+      error: 'Validation error',
+      message: error.message,
+      requestId,
+      timestamp
+    });
+  }
+  
+  if (error.code === 'ConditionalCheckFailedException') {
+    return res.status(409).json({
+      error: 'Conflict',
+      message: 'Hospital already exists or condition not met',
+      requestId,
+      timestamp
+    });
+  }
+  
+  if (error.code === 'ProvisionedThroughputExceededException') {
+    return res.status(429).json({
+      error: 'Rate limit exceeded',
+      message: 'Too many requests, please try again later',
+      requestId,
+      timestamp
+    });
+  }
+  
+  // Generic server error
+  res.status(500).json({
+    error: 'Internal server error',
+    message: 'An unexpected error occurred',
+    requestId,
+    timestamp
+  });
+};
+
+// Async wrapper for error handling
+const asyncHandler = (fn) => (req, res, next) => {
+  Promise.resolve(fn(req, res, next)).catch(next);
+};
+
 // Configure AWS
 const dynamoDB = new AWS.DynamoDB.DocumentClient({
   region: process.env.AWS_REGION || 'us-west-2',
@@ -51,154 +116,133 @@ app.get('/health', (req, res) => {
 });
 
 // Get all hospitals
-app.get('/hospitals', async (req, res) => {
-  try {
-    const params = {
-      TableName: tableName,
-    };
-    
-    const result = await dynamoDB.scan(params).promise();
-    
-    res.status(200).json(result.Items);
-  } catch (error) {
-    logger.error('Error fetching hospitals:', error);
-    res.status(500).json({ error: 'Failed to fetch hospitals' });
-  }
-});
+app.get('/hospitals', asyncHandler(async (req, res) => {
+  const params = {
+    TableName: tableName,
+  };
+  
+  const result = await dynamoDB.scan(params).promise();
+  res.status(200).json(result.Items);
+}));
 
 // Get hospital by ID
-app.get('/hospitals/:id', async (req, res) => {
-  try {
-    const params = {
-      TableName: tableName,
-      Key: {
-        id: req.params.id,
-      },
-    };
-    
-    const result = await dynamoDB.get(params).promise();
-    
-    if (!result.Item) {
-      return res.status(404).json({ error: 'Hospital not found' });
-    }
-    
-    res.status(200).json(result.Item);
-  } catch (error) {
-    logger.error(`Error fetching hospital ${req.params.id}:`, error);
-    res.status(500).json({ error: 'Failed to fetch hospital' });
+app.get('/hospitals/:id', asyncHandler(async (req, res) => {
+  const params = {
+    TableName: tableName,
+    Key: {
+      id: req.params.id,
+    },
+  };
+  
+  const result = await dynamoDB.get(params).promise();
+  
+  if (!result.Item) {
+    const error = new Error('Hospital not found');
+    error.code = 'ResourceNotFoundException';
+    throw error;
   }
-});
+  
+  res.status(200).json(result.Item);
+}));
 
 // Create hospital
-app.post('/hospitals', async (req, res) => {
-  try {
-    const { name, address, phone, email, capacity, services, operatingHours } = req.body;
-    
-    if (!name || !address || !phone) {
-      return res.status(400).json({ error: 'Missing required fields' });
-    }
-    
-    const hospital = {
-      id: uuidv4(),
-      name,
-      address,
-      phone,
-      email: email || null,
-      capacity: capacity || null,
-      services: services || [],
-      operatingHours: operatingHours || {},
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-    
-    const params = {
-      TableName: tableName,
-      Item: hospital,
-    };
-    
-    await dynamoDB.put(params).promise();
-    
-    res.status(201).json(hospital);
-  } catch (error) {
-    logger.error('Error creating hospital:', error);
-    res.status(500).json({ error: 'Failed to create hospital' });
+app.post('/hospitals', asyncHandler(async (req, res) => {
+  const { name, address, phone, email, capacity, services, operatingHours } = req.body;
+  
+  if (!name || !address || !phone) {
+    const error = new Error('Name, address, and phone are required fields');
+    error.code = 'ValidationException';
+    throw error;
   }
-});
+  
+  const hospital = {
+    id: uuidv4(),
+    name,
+    address,
+    phone,
+    email: email || null,
+    capacity: capacity || null,
+    services: services || [],
+    operatingHours: operatingHours || {},
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+  
+  const params = {
+    TableName: tableName,
+    Item: hospital,
+    ConditionExpression: 'attribute_not_exists(id)'
+  };
+  
+  await dynamoDB.put(params).promise();
+  res.status(201).json(hospital);
+}));
 
 // Update hospital
-app.put('/hospitals/:id', async (req, res) => {
-  try {
-    const { name, address, phone, email, capacity, services, operatingHours } = req.body;
-    
-    // Check if hospital exists
-    const getParams = {
-      TableName: tableName,
-      Key: {
-        id: req.params.id,
-      },
-    };
-    
-    const existingHospital = await dynamoDB.get(getParams).promise();
-    
-    if (!existingHospital.Item) {
-      return res.status(404).json({ error: 'Hospital not found' });
-    }
-    
-    // Update hospital
-    const updateParams = {
-      TableName: tableName,
-      Key: {
-        id: req.params.id,
-      },
-      UpdateExpression: 'set #name = :name, address = :address, phone = :phone, email = :email, capacity = :capacity, services = :services, operatingHours = :operatingHours, updatedAt = :updatedAt',
-      ExpressionAttributeNames: {
-        '#name': 'name', // 'name' is a reserved keyword in DynamoDB
-      },
-      ExpressionAttributeValues: {
-        ':name': name || existingHospital.Item.name,
-        ':address': address || existingHospital.Item.address,
-        ':phone': phone || existingHospital.Item.phone,
-        ':email': email || existingHospital.Item.email,
-        ':capacity': capacity || existingHospital.Item.capacity,
-        ':services': services || existingHospital.Item.services,
-        ':operatingHours': operatingHours || existingHospital.Item.operatingHours,
-        ':updatedAt': new Date().toISOString(),
-      },
-      ReturnValues: 'ALL_NEW',
-    };
-    
-    const result = await dynamoDB.update(updateParams).promise();
-    
-    res.status(200).json(result.Attributes);
-  } catch (error) {
-    logger.error(`Error updating hospital ${req.params.id}:`, error);
-    res.status(500).json({ error: 'Failed to update hospital' });
+app.put('/hospitals/:id', asyncHandler(async (req, res) => {
+  const { name, address, phone, email, capacity, services, operatingHours } = req.body;
+  
+  // Check if hospital exists first
+  const getParams = {
+    TableName: tableName,
+    Key: {
+      id: req.params.id,
+    },
+  };
+  
+  const existingHospital = await dynamoDB.get(getParams).promise();
+  
+  if (!existingHospital.Item) {
+    const error = new Error('Hospital not found');
+    error.code = 'ResourceNotFoundException';
+    throw error;
   }
-});
+  
+  // Update hospital
+  const updateParams = {
+    TableName: tableName,
+    Key: {
+      id: req.params.id,
+    },
+    UpdateExpression: 'set #name = :name, address = :address, phone = :phone, email = :email, capacity = :capacity, services = :services, operatingHours = :operatingHours, updatedAt = :updatedAt',
+    ExpressionAttributeNames: {
+      '#name': 'name', // 'name' is a reserved keyword in DynamoDB
+    },
+    ExpressionAttributeValues: {
+      ':name': name || existingHospital.Item.name,
+      ':address': address || existingHospital.Item.address,
+      ':phone': phone || existingHospital.Item.phone,
+      ':email': email || existingHospital.Item.email,
+      ':capacity': capacity || existingHospital.Item.capacity,
+      ':services': services || existingHospital.Item.services,
+      ':operatingHours': operatingHours || existingHospital.Item.operatingHours,
+      ':updatedAt': new Date().toISOString(),
+    },
+    ConditionExpression: 'attribute_exists(id)',
+    ReturnValues: 'ALL_NEW',
+  };
+  
+  const result = await dynamoDB.update(updateParams).promise();
+  res.status(200).json(result.Attributes);
+}));
 
 // Delete hospital
-app.delete('/hospitals/:id', async (req, res) => {
-  try {
-    const params = {
-      TableName: tableName,
-      Key: {
-        id: req.params.id,
-      },
-      ReturnValues: 'ALL_OLD',
-    };
-    
-    const result = await dynamoDB.delete(params).promise();
-    
-    if (!result.Attributes) {
-      return res.status(404).json({ error: 'Hospital not found' });
-    }
-    
-    res.status(200).json({ message: 'Hospital deleted successfully' });
-  } catch (error) {
-    logger.error(`Error deleting hospital ${req.params.id}:`, error);
-    res.status(500).json({ error: 'Failed to delete hospital' });
-  }
-});
+app.delete('/hospitals/:id', asyncHandler(async (req, res) => {
+  const params = {
+    TableName: tableName,
+    Key: {
+      id: req.params.id,
+    },
+    ConditionExpression: 'attribute_exists(id)',
+    ReturnValues: 'ALL_OLD',
+  };
+  
+  await dynamoDB.delete(params).promise();
+  res.status(200).json({ message: 'Hospital deleted successfully' });
+}));
+
+// Apply error handling middleware
+app.use(handleApiError);
 
 // Start server
 app.listen(port, () => {
