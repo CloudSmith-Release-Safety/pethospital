@@ -1,0 +1,111 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'CloudWatch Alarms for Pet Hospital Services'
+
+Parameters:
+  ClusterName:
+    Type: String
+    Default: app-signals-demo
+    Description: EKS Cluster Name
+  
+  NodeGroupName:
+    Type: String
+    Default: default-20250528202734212400000019
+    Description: EKS Node Group Name
+
+Resources:
+  # High Error Rate Alarm for EKS API Server
+  EKSHighErrorRateAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: pet-hospital-eks-high-error-rate
+      AlarmDescription: Monitor EKS API server 5XX errors
+      MetricName: apiserver_request_total_5XX
+      Namespace: AWS/EKS
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 2
+      Threshold: 10
+      ComparisonOperator: GreaterThanThreshold
+      Dimensions:
+        - Name: ClusterName
+          Value: !Ref ClusterName
+      TreatMissingData: notBreaching
+
+  # High CPU Utilization Alarm for EKS Nodes
+  EKSNodeHighCPUAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: pet-hospital-eks-node-high-cpu
+      AlarmDescription: Monitor EKS node CPU utilization
+      MetricName: CPUUtilization
+      Namespace: AWS/EC2
+      Statistic: Average
+      Period: 300
+      EvaluationPeriods: 2
+      Threshold: 80
+      ComparisonOperator: GreaterThanThreshold
+      Dimensions:
+        - Name: AutoScalingGroupName
+          Value: !Sub "eks-${NodeGroupName}-aecb8c4a-182e-9f82-7a59-cb152a5e07d9"
+      TreatMissingData: notBreaching
+
+  # EKS API Server 4XX Errors Alarm
+  EKSClient4XXErrorAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: pet-hospital-eks-4xx-errors
+      AlarmDescription: Monitor EKS API server 4XX client errors
+      MetricName: apiserver_request_total_4XX
+      Namespace: AWS/EKS
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 2
+      Threshold: 50
+      ComparisonOperator: GreaterThanThreshold
+      Dimensions:
+        - Name: ClusterName
+          Value: !Ref ClusterName
+      TreatMissingData: notBreaching
+
+  # RDS High CPU Alarm
+  RDSHighCPUAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: pet-hospital-rds-high-cpu
+      AlarmDescription: Monitor RDS CPU utilization
+      MetricName: CPUUtilization
+      Namespace: AWS/RDS
+      Statistic: Average
+      Period: 300
+      EvaluationPeriods: 2
+      Threshold: 75
+      ComparisonOperator: GreaterThanThreshold
+      Dimensions:
+        - Name: DBInstanceIdentifier
+          Value: petclinic-database
+      TreatMissingData: notBreaching
+
+Outputs:
+  EKSHighErrorRateAlarmArn:
+    Description: ARN of the EKS High Error Rate Alarm
+    Value: !GetAtt EKSHighErrorRateAlarm.Arn
+    Export:
+      Name: !Sub "${AWS::StackName}-EKSHighErrorRateAlarmArn"
+
+  EKSNodeHighCPUAlarmArn:
+    Description: ARN of the EKS Node High CPU Alarm
+    Value: !GetAtt EKSNodeHighCPUAlarm.Arn
+    Export:
+      Name: !Sub "${AWS::StackName}-EKSNodeHighCPUAlarmArn"
+
+  EKSClient4XXErrorAlarmArn:
+    Description: ARN of the EKS 4XX Error Alarm
+    Value: !GetAtt EKSClient4XXErrorAlarm.Arn
+    Export:
+      Name: !Sub "${AWS::StackName}-EKSClient4XXErrorAlarmArn"
+
+  RDSHighCPUAlarmArn:
+    Description: ARN of the RDS High CPU Alarm
+    Value: !GetAtt RDSHighCPUAlarm.Arn
+    Export:
+      Name: !Sub "${AWS::StackName}-RDSHighCPUAlarmArn"
