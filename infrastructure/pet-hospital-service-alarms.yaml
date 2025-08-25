@@ -1,0 +1,391 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Comprehensive CloudWatch Alarms for Pet Hospital Backend Services - Error Handling Monitoring'
+
+Parameters:
+  ClusterName:
+    Type: String
+    Default: app-signals-demo
+    Description: EKS Cluster Name
+
+Resources:
+  # HTTP 4XX Error Rate Alarms for each service
+  PetService4XXErrorAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: pet-hospital-pet-service-4xx-errors
+      AlarmDescription: Monitor pet-service HTTP 4XX error rate from error handling changes
+      MetricName: HTTPCode_Target_4XX_Count
+      Namespace: AWS/ApplicationELB
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 2
+      Threshold: 10
+      ComparisonOperator: GreaterThanThreshold
+      Dimensions:
+        - Name: TargetGroup
+          Value: pet-service-tg
+      TreatMissingData: notBreaching
+
+  DoctorService4XXErrorAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: pet-hospital-doctor-service-4xx-errors
+      AlarmDescription: Monitor doctor-service HTTP 4XX error rate from error handling changes
+      MetricName: HTTPCode_Target_4XX_Count
+      Namespace: AWS/ApplicationELB
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 2
+      Threshold: 10
+      ComparisonOperator: GreaterThanThreshold
+      Dimensions:
+        - Name: TargetGroup
+          Value: doctor-service-tg
+      TreatMissingData: notBreaching
+
+  HospitalService4XXErrorAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: pet-hospital-hospital-service-4xx-errors
+      AlarmDescription: Monitor hospital-service HTTP 4XX error rate from error handling changes
+      MetricName: HTTPCode_Target_4XX_Count
+      Namespace: AWS/ApplicationELB
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 2
+      Threshold: 10
+      ComparisonOperator: GreaterThanThreshold
+      Dimensions:
+        - Name: TargetGroup
+          Value: hospital-service-tg
+      TreatMissingData: notBreaching
+
+  # HTTP 5XX Error Rate Alarms for each service
+  PetService5XXErrorAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: pet-hospital-pet-service-5xx-errors
+      AlarmDescription: Monitor pet-service HTTP 5XX error rate from error handling changes
+      MetricName: HTTPCode_Target_5XX_Count
+      Namespace: AWS/ApplicationELB
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 5
+      ComparisonOperator: GreaterThanThreshold
+      Dimensions:
+        - Name: TargetGroup
+          Value: pet-service-tg
+      TreatMissingData: notBreaching
+
+  DoctorService5XXErrorAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: pet-hospital-doctor-service-5xx-errors
+      AlarmDescription: Monitor doctor-service HTTP 5XX error rate from error handling changes
+      MetricName: HTTPCode_Target_5XX_Count
+      Namespace: AWS/ApplicationELB
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 5
+      ComparisonOperator: GreaterThanThreshold
+      Dimensions:
+        - Name: TargetGroup
+          Value: doctor-service-tg
+      TreatMissingData: notBreaching
+
+  HospitalService5XXErrorAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: pet-hospital-hospital-service-5xx-errors
+      AlarmDescription: Monitor hospital-service HTTP 5XX error rate from error handling changes
+      MetricName: HTTPCode_Target_5XX_Count
+      Namespace: AWS/ApplicationELB
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 5
+      ComparisonOperator: GreaterThanThreshold
+      Dimensions:
+        - Name: TargetGroup
+          Value: hospital-service-tg
+      TreatMissingData: notBreaching
+
+  # Error Rate > 1% Alarms (using math expression)
+  PetServiceErrorRateAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: pet-hospital-pet-service-error-rate-high
+      AlarmDescription: Monitor pet-service error rate > 1% from error handling changes
+      ComparisonOperator: GreaterThanThreshold
+      EvaluationPeriods: 2
+      Threshold: 1.0
+      TreatMissingData: notBreaching
+      Metrics:
+        - Id: e1
+          Expression: "(m1 + m2) / m3 * 100"
+          Label: "Error Rate Percentage"
+          ReturnData: true
+        - Id: m1
+          MetricStat:
+            Metric:
+              MetricName: HTTPCode_Target_4XX_Count
+              Namespace: AWS/ApplicationELB
+              Dimensions:
+                - Name: TargetGroup
+                  Value: pet-service-tg
+            Period: 300
+            Stat: Sum
+          ReturnData: false
+        - Id: m2
+          MetricStat:
+            Metric:
+              MetricName: HTTPCode_Target_5XX_Count
+              Namespace: AWS/ApplicationELB
+              Dimensions:
+                - Name: TargetGroup
+                  Value: pet-service-tg
+            Period: 300
+            Stat: Sum
+          ReturnData: false
+        - Id: m3
+          MetricStat:
+            Metric:
+              MetricName: RequestCount
+              Namespace: AWS/ApplicationELB
+              Dimensions:
+                - Name: TargetGroup
+                  Value: pet-service-tg
+            Period: 300
+            Stat: Sum
+          ReturnData: false
+
+  DoctorServiceErrorRateAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: pet-hospital-doctor-service-error-rate-high
+      AlarmDescription: Monitor doctor-service error rate > 1% from error handling changes
+      ComparisonOperator: GreaterThanThreshold
+      EvaluationPeriods: 2
+      Threshold: 1.0
+      TreatMissingData: notBreaching
+      Metrics:
+        - Id: e1
+          Expression: "(m1 + m2) / m3 * 100"
+          Label: "Error Rate Percentage"
+          ReturnData: true
+        - Id: m1
+          MetricStat:
+            Metric:
+              MetricName: HTTPCode_Target_4XX_Count
+              Namespace: AWS/ApplicationELB
+              Dimensions:
+                - Name: TargetGroup
+                  Value: doctor-service-tg
+            Period: 300
+            Stat: Sum
+          ReturnData: false
+        - Id: m2
+          MetricStat:
+            Metric:
+              MetricName: HTTPCode_Target_5XX_Count
+              Namespace: AWS/ApplicationELB
+              Dimensions:
+                - Name: TargetGroup
+                  Value: doctor-service-tg
+            Period: 300
+            Stat: Sum
+          ReturnData: false
+        - Id: m3
+          MetricStat:
+            Metric:
+              MetricName: RequestCount
+              Namespace: AWS/ApplicationELB
+              Dimensions:
+                - Name: TargetGroup
+                  Value: doctor-service-tg
+            Period: 300
+            Stat: Sum
+          ReturnData: false
+
+  HospitalServiceErrorRateAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: pet-hospital-hospital-service-error-rate-high
+      AlarmDescription: Monitor hospital-service error rate > 1% from error handling changes
+      ComparisonOperator: GreaterThanThreshold
+      EvaluationPeriods: 2
+      Threshold: 1.0
+      TreatMissingData: notBreaching
+      Metrics:
+        - Id: e1
+          Expression: "(m1 + m2) / m3 * 100"
+          Label: "Error Rate Percentage"
+          ReturnData: true
+        - Id: m1
+          MetricStat:
+            Metric:
+              MetricName: HTTPCode_Target_4XX_Count
+              Namespace: AWS/ApplicationELB
+              Dimensions:
+                - Name: TargetGroup
+                  Value: hospital-service-tg
+            Period: 300
+            Stat: Sum
+          ReturnData: false
+        - Id: m2
+          MetricStat:
+            Metric:
+              MetricName: HTTPCode_Target_5XX_Count
+              Namespace: AWS/ApplicationELB
+              Dimensions:
+                - Name: TargetGroup
+                  Value: hospital-service-tg
+            Period: 300
+            Stat: Sum
+          ReturnData: false
+        - Id: m3
+          MetricStat:
+            Metric:
+              MetricName: RequestCount
+              Namespace: AWS/ApplicationELB
+              Dimensions:
+                - Name: TargetGroup
+                  Value: hospital-service-tg
+            Period: 300
+            Stat: Sum
+          ReturnData: false
+
+  # Latency P99 > 1000ms Alarms
+  PetServiceLatencyP99Alarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: pet-hospital-pet-service-latency-p99-high
+      AlarmDescription: Monitor pet-service P99 latency > 1000ms from error processing overhead
+      MetricName: TargetResponseTime
+      Namespace: AWS/ApplicationELB
+      ExtendedStatistic: p99
+      Period: 300
+      EvaluationPeriods: 2
+      Threshold: 1.0
+      ComparisonOperator: GreaterThanThreshold
+      Dimensions:
+        - Name: TargetGroup
+          Value: pet-service-tg
+      TreatMissingData: notBreaching
+
+  DoctorServiceLatencyP99Alarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: pet-hospital-doctor-service-latency-p99-high
+      AlarmDescription: Monitor doctor-service P99 latency > 1000ms from error processing overhead
+      MetricName: TargetResponseTime
+      Namespace: AWS/ApplicationELB
+      ExtendedStatistic: p99
+      Period: 300
+      EvaluationPeriods: 2
+      Threshold: 1.0
+      ComparisonOperator: GreaterThanThreshold
+      Dimensions:
+        - Name: TargetGroup
+          Value: doctor-service-tg
+      TreatMissingData: notBreaching
+
+  HospitalServiceLatencyP99Alarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: pet-hospital-hospital-service-latency-p99-high
+      AlarmDescription: Monitor hospital-service P99 latency > 1000ms from error processing overhead
+      MetricName: TargetResponseTime
+      Namespace: AWS/ApplicationELB
+      ExtendedStatistic: p99
+      Period: 300
+      EvaluationPeriods: 2
+      Threshold: 1.0
+      ComparisonOperator: GreaterThanThreshold
+      Dimensions:
+        - Name: TargetGroup
+          Value: hospital-service-tg
+      TreatMissingData: notBreaching
+
+  # Pod Restart Alarms (keeping existing infrastructure monitoring)
+  PetServicePodRestartAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: pet-hospital-pet-service-pod-restarts
+      AlarmDescription: Monitor pet-service pod restarts due to error handling issues
+      MetricName: pod_restart_total
+      Namespace: ContainerInsights
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 3
+      ComparisonOperator: GreaterThanThreshold
+      Dimensions:
+        - Name: ClusterName
+          Value: !Ref ClusterName
+        - Name: Namespace
+          Value: default
+        - Name: PodName
+          Value: pet-service
+      TreatMissingData: notBreaching
+
+  DoctorServicePodRestartAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: pet-hospital-doctor-service-pod-restarts
+      AlarmDescription: Monitor doctor-service pod restarts due to error handling issues
+      MetricName: pod_restart_total
+      Namespace: ContainerInsights
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 3
+      ComparisonOperator: GreaterThanThreshold
+      Dimensions:
+        - Name: ClusterName
+          Value: !Ref ClusterName
+        - Name: Namespace
+          Value: default
+        - Name: PodName
+          Value: doctor-service
+      TreatMissingData: notBreaching
+
+  HospitalServicePodRestartAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: pet-hospital-hospital-service-pod-restarts
+      AlarmDescription: Monitor hospital-service pod restarts due to error handling issues
+      MetricName: pod_restart_total
+      Namespace: ContainerInsights
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 3
+      ComparisonOperator: GreaterThanThreshold
+      Dimensions:
+        - Name: ClusterName
+          Value: !Ref ClusterName
+        - Name: Namespace
+          Value: default
+        - Name: PodName
+          Value: hospital-service
+      TreatMissingData: notBreaching
+
+Outputs:
+  PetService4XXErrorAlarmArn:
+    Description: ARN of the Pet Service 4XX Error Alarm
+    Value: !GetAtt PetService4XXErrorAlarm.Arn
+
+  PetService5XXErrorAlarmArn:
+    Description: ARN of the Pet Service 5XX Error Alarm
+    Value: !GetAtt PetService5XXErrorAlarm.Arn
+
+  PetServiceErrorRateAlarmArn:
+    Description: ARN of the Pet Service Error Rate Alarm
+    Value: !GetAtt PetServiceErrorRateAlarm.Arn
+
+  PetServiceLatencyP99AlarmArn:
+    Description: ARN of the Pet Service Latency P99 Alarm
+    Value: !GetAtt PetServiceLatencyP99Alarm.Arn
