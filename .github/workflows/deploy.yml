@@ -243,8 +243,8 @@ jobs:
                   proxy_cache_bypass $http_upgrade;
               }
 
-              location /api/hospitals {
-                  proxy_pass http://hospital-service:3000/hospitals;
+              location /api/hospital {
+                  proxy_pass http://hospital-service:3000/hospital;
                   proxy_http_version 1.1;
                   proxy_set_header Upgrade $http_upgrade;
                   proxy_set_header Connection 'upgrade';

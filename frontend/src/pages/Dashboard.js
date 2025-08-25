@@ -43,7 +43,7 @@ function Dashboard() {
       }
 
       try {
-        const hospitalsResponse = await axios.get('/api/hospitals');
+        const hospitalsResponse = await axios.get('/api/hospital');
         setStats(prev => ({
           ...prev,
           hospitals: { count: hospitalsResponse.data.length, loading: false, error: null }
@@ -101,7 +101,7 @@ function Dashboard() {
       count: stats.hospitals.count,
       loading: stats.hospitals.loading,
       error: stats.hospitals.error,
-      link: '/hospitals',
+      link: '/hospital',
       color: '#f50057',
     },
     {
