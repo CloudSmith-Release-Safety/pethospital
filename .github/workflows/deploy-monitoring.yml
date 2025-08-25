@@ -1,0 +1,42 @@
+name: Deploy CloudWatch Monitoring
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'infrastructure/cloudwatch-alarms.yaml'
+      - 'deploy-alarms.sh'
+      - '.github/workflows/deploy-monitoring.yml'
+  
+  workflow_dispatch:
+
+jobs:
+  deploy-monitoring:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: us-east-1
+    
+    - name: Deploy CloudWatch Alarms
+      run: |
+        ./deploy-alarms.sh
+    
+    - name: Verify Alarms
+      run: |
+        echo "Verifying deployed alarms..."
+        aws cloudwatch describe-alarms \
+          --alarm-names \
+            "pet-hospital-eks-high-error-rate" \
+            "pet-hospital-eks-node-high-cpu" \
+            "pet-hospital-eks-4xx-errors" \
+            "pet-hospital-rds-high-cpu" \
+          --query 'MetricAlarms[].{Name:AlarmName,State:StateValue}' \
+          --output table
