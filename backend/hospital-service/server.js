@@ -59,7 +59,51 @@ app.get('/hospitals', async (req, res) => {
     
     const result = await dynamoDB.scan(params).promise();
     
-    res.status(200).json(result.Items);
+    // New complex query: Enrich hospital data with additional statistics
+    const enrichedHospitals = await Promise.all(
+      result.Items.map(async (hospital) => {
+        // Query related visits for each hospital (cross-table query)
+        const visitParams = {
+          TableName: 'pet-hospital-visits',
+          FilterExpression: 'hospitalId = :hospitalId',
+          ExpressionAttributeValues: {
+            ':hospitalId': hospital.id
+          }
+        };
+        
+        const visits = await dynamoDB.scan(visitParams).promise();
+        
+        // Query related doctors for each hospital
+        const doctorParams = {
+          TableName: 'pet-hospital-doctors',
+          FilterExpression: 'hospitalId = :hospitalId',
+          ExpressionAttributeValues: {
+            ':hospitalId': hospital.id
+          }
+        };
+        
+        const doctors = await dynamoDB.scan(doctorParams).promise();
+        
+        // Calculate hospital statistics
+        const totalVisits = visits.Items.length;
+        const totalDoctors = doctors.Items.length;
+        const avgVisitsPerDoctor = totalDoctors > 0 ? (totalVisits / totalDoctors).toFixed(2) : 0;
+        
+        // Add computed fields that require additional processing
+        return {
+          ...hospital,
+          statistics: {
+            totalVisits,
+            totalDoctors,
+            avgVisitsPerDoctor,
+            utilizationRate: hospital.capacity > 0 ? ((totalVisits / hospital.capacity) * 100).toFixed(2) : 0,
+            lastUpdated: new Date().toISOString()
+          }
+        };
+      })
+    );
+    
+    res.status(200).json(enrichedHospitals);
   } catch (error) {
     logger.error('Error fetching hospitals:', error);
     res.status(500).json({ error: 'Failed to fetch hospitals' });
