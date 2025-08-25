@@ -1,0 +1,223 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'CloudWatch Alarms for Pet Hospital Services with Advanced Metrics'
+
+Parameters:
+  ClusterName:
+    Type: String
+    Default: app-signals-demo
+    Description: EKS Cluster Name
+  
+  NodeGroupName:
+    Type: String
+    Default: default-20250528202734212400000019
+    Description: EKS Node Group Name
+
+Resources:
+  # EKS API Server P99 Latency Alarm
+  EKSAPILatencyP99Alarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: pet-hospital-eks-api-latency-p99
+      AlarmDescription: Monitor EKS API server P99 request latency
+      MetricName: apiserver_request_duration_seconds_GET_P99
+      Namespace: AWS/EKS
+      Statistic: Average
+      Period: 300
+      EvaluationPeriods: 2
+      Threshold: 2.0
+      ComparisonOperator: GreaterThanThreshold
+      Dimensions:
+        - Name: ClusterName
+          Value: !Ref ClusterName
+      TreatMissingData: notBreaching
+
+  # EKS API Server POST P99 Latency Alarm
+  EKSAPIPOSTLatencyP99Alarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: pet-hospital-eks-post-latency-p99
+      AlarmDescription: Monitor EKS API server POST P99 request latency
+      MetricName: apiserver_request_duration_seconds_POST_P99
+      Namespace: AWS/EKS
+      Statistic: Average
+      Period: 300
+      EvaluationPeriods: 2
+      Threshold: 3.0
+      ComparisonOperator: GreaterThanThreshold
+      Dimensions:
+        - Name: ClusterName
+          Value: !Ref ClusterName
+      TreatMissingData: notBreaching
+
+  # Lambda Duration P95 Alarm
+  LambdaDurationP95Alarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: pet-hospital-lambda-duration-p95
+      AlarmDescription: Monitor Lambda function P95 duration
+      MetricName: Duration
+      Namespace: AWS/Lambda
+      Statistic: Average
+      Period: 300
+      EvaluationPeriods: 2
+      Threshold: 5000
+      ComparisonOperator: GreaterThanThreshold
+      Dimensions:
+        - Name: FunctionName
+          Value: serverlesspresso-core-v2-GetIoTEndpointFunction-bTtIEnGeo1Dy
+      TreatMissingData: notBreaching
+
+  # Lambda Throttles Alarm
+  LambdaThrottlesAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: pet-hospital-lambda-throttles
+      AlarmDescription: Monitor Lambda function throttles
+      MetricName: Throttles
+      Namespace: AWS/Lambda
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      Dimensions:
+        - Name: FunctionName
+          Value: serverlesspresso-core-v2-GetIoTEndpointFunction-bTtIEnGeo1Dy
+      TreatMissingData: notBreaching
+
+  # Lambda Errors Alarm
+  LambdaErrorsAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: pet-hospital-lambda-errors
+      AlarmDescription: Monitor Lambda function errors
+      MetricName: Errors
+      Namespace: AWS/Lambda
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 5
+      ComparisonOperator: GreaterThanThreshold
+      Dimensions:
+        - Name: FunctionName
+          Value: serverlesspresso-core-v2-GetIoTEndpointFunction-bTtIEnGeo1Dy
+      TreatMissingData: notBreaching
+
+  # RDS Read Latency Alarm
+  RDSReadLatencyAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: pet-hospital-rds-read-latency
+      AlarmDescription: Monitor RDS read latency
+      MetricName: ReadLatency
+      Namespace: AWS/RDS
+      Statistic: Average
+      Period: 300
+      EvaluationPeriods: 2
+      Threshold: 0.2
+      ComparisonOperator: GreaterThanThreshold
+      Dimensions:
+        - Name: DBInstanceIdentifier
+          Value: petclinic-database
+      TreatMissingData: notBreaching
+
+  # RDS Write Latency Alarm
+  RDSWriteLatencyAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: pet-hospital-rds-write-latency
+      AlarmDescription: Monitor RDS write latency
+      MetricName: WriteLatency
+      Namespace: AWS/RDS
+      Statistic: Average
+      Period: 300
+      EvaluationPeriods: 2
+      Threshold: 0.2
+      ComparisonOperator: GreaterThanThreshold
+      Dimensions:
+        - Name: DBInstanceIdentifier
+          Value: petclinic-database
+      TreatMissingData: notBreaching
+
+  # EKS Scheduler Pending Pods Alarm
+  EKSSchedulerPendingPodsAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: pet-hospital-eks-pending-pods
+      AlarmDescription: Monitor EKS scheduler pending pods
+      MetricName: scheduler_pending_pods
+      Namespace: AWS/EKS
+      Statistic: Average
+      Period: 300
+      EvaluationPeriods: 2
+      Threshold: 10
+      ComparisonOperator: GreaterThanThreshold
+      Dimensions:
+        - Name: ClusterName
+          Value: !Ref ClusterName
+      TreatMissingData: notBreaching
+
+  # High Error Rate Alarm for EKS API Server
+  EKSHighErrorRateAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: pet-hospital-eks-high-error-rate
+      AlarmDescription: Monitor EKS API server 5XX errors
+      MetricName: apiserver_request_total_5XX
+      Namespace: AWS/EKS
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 2
+      Threshold: 10
+      ComparisonOperator: GreaterThanThreshold
+      Dimensions:
+        - Name: ClusterName
+          Value: !Ref ClusterName
+      TreatMissingData: notBreaching
+
+  # High CPU Utilization Alarm for EKS Nodes
+  EKSNodeHighCPUAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: pet-hospital-eks-node-high-cpu
+      AlarmDescription: Monitor EKS node CPU utilization
+      MetricName: CPUUtilization
+      Namespace: AWS/EC2
+      Statistic: Average
+      Period: 300
+      EvaluationPeriods: 2
+      Threshold: 80
+      ComparisonOperator: GreaterThanThreshold
+      Dimensions:
+        - Name: AutoScalingGroupName
+          Value: !Sub "eks-${NodeGroupName}-aecb8c4a-182e-9f82-7a59-cb152a5e07d9"
+      TreatMissingData: notBreaching
+
+Outputs:
+  EKSAPILatencyP99AlarmArn:
+    Description: ARN of the EKS API P99 Latency Alarm
+    Value: !GetAtt EKSAPILatencyP99Alarm.Arn
+
+  EKSAPIPOSTLatencyP99AlarmArn:
+    Description: ARN of the EKS API POST P99 Latency Alarm
+    Value: !GetAtt EKSAPIPOSTLatencyP99Alarm.Arn
+
+  LambdaDurationP95AlarmArn:
+    Description: ARN of the Lambda Duration P95 Alarm
+    Value: !GetAtt LambdaDurationP95Alarm.Arn
+
+  LambdaThrottlesAlarmArn:
+    Description: ARN of the Lambda Throttles Alarm
+    Value: !GetAtt LambdaThrottlesAlarm.Arn
+
+  LambdaErrorsAlarmArn:
+    Description: ARN of the Lambda Errors Alarm
+    Value: !GetAtt LambdaErrorsAlarm.Arn
+
+  RDSReadLatencyAlarmArn:
+    Description: ARN of the RDS Read Latency Alarm
+    Value: !GetAtt RDSReadLatencyAlarm.Arn
+
+  RDSWriteLatencyAlarmArn:
+    Description: ARN of the RDS Write Latency Alarm
+    Value: !GetAtt RDSWriteLatencyAlarm.Arn
