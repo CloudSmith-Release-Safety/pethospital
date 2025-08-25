@@ -1,0 +1,232 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'CloudWatch Alarms for Pet Hospital Backend Services - Correlated to Error Handling Changes'
+
+Parameters:
+  ClusterName:
+    Type: String
+    Default: app-signals-demo
+    Description: EKS Cluster Name
+
+Resources:
+  # Pet Service Pod Restart Alarm - Monitors if error handling changes cause crashes
+  PetServicePodRestartAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: pet-hospital-pet-service-pod-restarts
+      AlarmDescription: Monitor pet-service pod restarts due to error handling issues
+      MetricName: pod_restart_total
+      Namespace: ContainerInsights
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 3
+      ComparisonOperator: GreaterThanThreshold
+      Dimensions:
+        - Name: ClusterName
+          Value: !Ref ClusterName
+        - Name: Namespace
+          Value: default
+        - Name: PodName
+          Value: pet-service
+      TreatMissingData: notBreaching
+
+  # Doctor Service Pod Restart Alarm
+  DoctorServicePodRestartAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: pet-hospital-doctor-service-pod-restarts
+      AlarmDescription: Monitor doctor-service pod restarts due to error handling issues
+      MetricName: pod_restart_total
+      Namespace: ContainerInsights
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 3
+      ComparisonOperator: GreaterThanThreshold
+      Dimensions:
+        - Name: ClusterName
+          Value: !Ref ClusterName
+        - Name: Namespace
+          Value: default
+        - Name: PodName
+          Value: doctor-service
+      TreatMissingData: notBreaching
+
+  # Hospital Service Pod Restart Alarm
+  HospitalServicePodRestartAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: pet-hospital-hospital-service-pod-restarts
+      AlarmDescription: Monitor hospital-service pod restarts due to error handling issues
+      MetricName: pod_restart_total
+      Namespace: ContainerInsights
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 3
+      ComparisonOperator: GreaterThanThreshold
+      Dimensions:
+        - Name: ClusterName
+          Value: !Ref ClusterName
+        - Name: Namespace
+          Value: default
+        - Name: PodName
+          Value: hospital-service
+      TreatMissingData: notBreaching
+
+  # Pet Service Memory Usage Alarm - Error objects increase memory
+  PetServiceMemoryAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: pet-hospital-pet-service-memory-high
+      AlarmDescription: Monitor pet-service memory usage increase from structured error objects
+      MetricName: pod_memory_utilization
+      Namespace: ContainerInsights
+      Statistic: Average
+      Period: 300
+      EvaluationPeriods: 2
+      Threshold: 80
+      ComparisonOperator: GreaterThanThreshold
+      Dimensions:
+        - Name: ClusterName
+          Value: !Ref ClusterName
+        - Name: Namespace
+          Value: default
+        - Name: PodName
+          Value: pet-service
+      TreatMissingData: notBreaching
+
+  # Doctor Service Memory Usage Alarm
+  DoctorServiceMemoryAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: pet-hospital-doctor-service-memory-high
+      AlarmDescription: Monitor doctor-service memory usage increase from structured error objects
+      MetricName: pod_memory_utilization
+      Namespace: ContainerInsights
+      Statistic: Average
+      Period: 300
+      EvaluationPeriods: 2
+      Threshold: 80
+      ComparisonOperator: GreaterThanThreshold
+      Dimensions:
+        - Name: ClusterName
+          Value: !Ref ClusterName
+        - Name: Namespace
+          Value: default
+        - Name: PodName
+          Value: doctor-service
+      TreatMissingData: notBreaching
+
+  # Hospital Service Memory Usage Alarm
+  HospitalServiceMemoryAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: pet-hospital-hospital-service-memory-high
+      AlarmDescription: Monitor hospital-service memory usage increase from structured error objects
+      MetricName: pod_memory_utilization
+      Namespace: ContainerInsights
+      Statistic: Average
+      Period: 300
+      EvaluationPeriods: 2
+      Threshold: 80
+      ComparisonOperator: GreaterThanThreshold
+      Dimensions:
+        - Name: ClusterName
+          Value: !Ref ClusterName
+        - Name: Namespace
+          Value: default
+        - Name: PodName
+          Value: hospital-service
+      TreatMissingData: notBreaching
+
+  # Pet Service CPU Usage Alarm - JSON processing overhead
+  PetServiceCPUAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: pet-hospital-pet-service-cpu-high
+      AlarmDescription: Monitor pet-service CPU usage increase from error object processing
+      MetricName: pod_cpu_utilization
+      Namespace: ContainerInsights
+      Statistic: Average
+      Period: 300
+      EvaluationPeriods: 2
+      Threshold: 70
+      ComparisonOperator: GreaterThanThreshold
+      Dimensions:
+        - Name: ClusterName
+          Value: !Ref ClusterName
+        - Name: Namespace
+          Value: default
+        - Name: PodName
+          Value: pet-service
+      TreatMissingData: notBreaching
+
+  # Doctor Service CPU Usage Alarm
+  DoctorServiceCPUAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: pet-hospital-doctor-service-cpu-high
+      AlarmDescription: Monitor doctor-service CPU usage increase from error object processing
+      MetricName: pod_cpu_utilization
+      Namespace: ContainerInsights
+      Statistic: Average
+      Period: 300
+      EvaluationPeriods: 2
+      Threshold: 70
+      ComparisonOperator: GreaterThanThreshold
+      Dimensions:
+        - Name: ClusterName
+          Value: !Ref ClusterName
+        - Name: Namespace
+          Value: default
+        - Name: PodName
+          Value: doctor-service
+      TreatMissingData: notBreaching
+
+  # Hospital Service CPU Usage Alarm
+  HospitalServiceCPUAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: pet-hospital-hospital-service-cpu-high
+      AlarmDescription: Monitor hospital-service CPU usage increase from error object processing
+      MetricName: pod_cpu_utilization
+      Namespace: ContainerInsights
+      Statistic: Average
+      Period: 300
+      EvaluationPeriods: 2
+      Threshold: 70
+      ComparisonOperator: GreaterThanThreshold
+      Dimensions:
+        - Name: ClusterName
+          Value: !Ref ClusterName
+        - Name: Namespace
+          Value: default
+        - Name: PodName
+          Value: hospital-service
+      TreatMissingData: notBreaching
+
+Outputs:
+  PetServicePodRestartAlarmArn:
+    Description: ARN of the Pet Service Pod Restart Alarm
+    Value: !GetAtt PetServicePodRestartAlarm.Arn
+
+  DoctorServicePodRestartAlarmArn:
+    Description: ARN of the Doctor Service Pod Restart Alarm
+    Value: !GetAtt DoctorServicePodRestartAlarm.Arn
+
+  HospitalServicePodRestartAlarmArn:
+    Description: ARN of the Hospital Service Pod Restart Alarm
+    Value: !GetAtt HospitalServicePodRestartAlarm.Arn
+
+  PetServiceMemoryAlarmArn:
+    Description: ARN of the Pet Service Memory Alarm
+    Value: !GetAtt PetServiceMemoryAlarm.Arn
+
+  DoctorServiceMemoryAlarmArn:
+    Description: ARN of the Doctor Service Memory Alarm
+    Value: !GetAtt DoctorServiceMemoryAlarm.Arn
+
+  HospitalServiceMemoryAlarmArn:
+    Description: ARN of the Hospital Service Memory Alarm
+    Value: !GetAtt HospitalServiceMemoryAlarm.Arn
