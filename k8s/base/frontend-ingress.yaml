@@ -11,6 +11,27 @@ spec:
   rules:
     - http:
         paths:
+          - path: /api/pets
+            pathType: Prefix
+            backend:
+              service:
+                name: pet-service
+                port:
+                  number: 3000
+          - path: /api/doctors
+            pathType: Prefix
+            backend:
+              service:
+                name: doctor-service
+                port:
+                  number: 3000
+          - path: /api/hospitals
+            pathType: Prefix
+            backend:
+              service:
+                name: hospital-service
+                port:
+                  number: 3000
           - path: /
             pathType: Prefix
             backend:
