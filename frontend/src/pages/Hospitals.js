@@ -51,7 +51,7 @@ const Hospitals = () => {
     const fetchHospitals = async () => {
       try {
         setLoading(true);
-        const response = await fetch('/api/hospitals');
+        const response = await fetch('/api/hospital');
         
         if (!response.ok) {
           throw new Error('Failed to fetch hospitals');
@@ -112,7 +112,7 @@ const Hospitals = () => {
       };
       
       // Make API call to create hospital
-      const response = await fetch('/api/hospitals', {
+      const response = await fetch('/api/hospital', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -215,7 +215,7 @@ const Hospitals = () => {
                   <TableCell>
                     <Button 
                       component={Link} 
-                      to={`/hospitals/${hospital.id}`}
+                      to={`/hospital/${hospital.id}`}
                       variant="outlined" 
                       size="small"
                     >

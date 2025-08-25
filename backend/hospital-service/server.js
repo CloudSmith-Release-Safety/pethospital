@@ -51,7 +51,7 @@ app.get('/health', (req, res) => {
 });
 
 // Get all hospitals
-app.get('/hospitals', async (req, res) => {
+app.get('/hospital', async (req, res) => {
   try {
     const params = {
       TableName: tableName,
@@ -67,7 +67,7 @@ app.get('/hospitals', async (req, res) => {
 });
 
 // Get hospital by ID
-app.get('/hospitals/:id', async (req, res) => {
+app.get('/hospital/:id', async (req, res) => {
   try {
     const params = {
       TableName: tableName,
@@ -90,7 +90,7 @@ app.get('/hospitals/:id', async (req, res) => {
 });
 
 // Create hospital
-app.post('/hospitals', async (req, res) => {
+app.post('/hospital', async (req, res) => {
   try {
     const { name, address, phone, email, capacity, services, operatingHours } = req.body;
     
@@ -126,7 +126,7 @@ app.post('/hospitals', async (req, res) => {
 });
 
 // Update hospital
-app.put('/hospitals/:id', async (req, res) => {
+app.put('/hospital/:id', async (req, res) => {
   try {
     const { name, address, phone, email, capacity, services, operatingHours } = req.body;
     
@@ -177,7 +177,7 @@ app.put('/hospitals/:id', async (req, res) => {
 });
 
 // Delete hospital
-app.delete('/hospitals/:id', async (req, res) => {
+app.delete('/hospital/:id', async (req, res) => {
   try {
     const params = {
       TableName: tableName,
