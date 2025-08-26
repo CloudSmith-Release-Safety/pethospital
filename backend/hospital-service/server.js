@@ -4,6 +4,7 @@ const cors = require('cors');
 const AWS = require('aws-sdk');
 const { v4: uuidv4 } = require('uuid');
 const winston = require('winston');
+const sqsService = require('./sqs-service');
 
 // Configure logger
 const logger = winston.createLogger({
@@ -107,10 +108,12 @@ app.post('/hospitals', async (req, res) => {
       capacity: capacity || null,
       services: services || [],
       operatingHours: operatingHours || {},
+      status: 'pending_validation', // New status for async processing
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
     
+    // Save hospital to database first
     const params = {
       TableName: tableName,
       Item: hospital,
@@ -118,7 +121,38 @@ app.post('/hospitals', async (req, res) => {
     
     await dynamoDB.put(params).promise();
     
-    res.status(201).json(hospital);
+    // Queue hospital for async processing
+    try {
+      const messageId = await sqsService.queueHospitalProcessing(hospital, 'create');
+      
+      // Queue notification for hospital creation
+      await sqsService.queueNotification(hospital.id, 'created', ['admin@hospital.com']);
+      
+      logger.info('Hospital created and queued for processing', {
+        hospitalId: hospital.id,
+        messageId: messageId
+      });
+      
+      res.status(202).json({
+        ...hospital,
+        message: 'Hospital created and queued for validation',
+        processingStatus: 'queued'
+      });
+      
+    } catch (sqsError) {
+      logger.error('Failed to queue hospital processing', {
+        hospitalId: hospital.id,
+        error: sqsError.message
+      });
+      
+      // Hospital was saved but queuing failed - still return success
+      res.status(201).json({
+        ...hospital,
+        message: 'Hospital created but async processing failed',
+        processingStatus: 'failed_to_queue'
+      });
+    }
+    
   } catch (error) {
     logger.error('Error creating hospital:', error);
     res.status(500).json({ error: 'Failed to create hospital' });
@@ -197,6 +231,72 @@ app.delete('/hospitals/:id', async (req, res) => {
   } catch (error) {
     logger.error(`Error deleting hospital ${req.params.id}:`, error);
     res.status(500).json({ error: 'Failed to delete hospital' });
+  }
+});
+
+// Async processing endpoints
+app.post('/hospitals/bulk-process', async (req, res) => {
+  try {
+    const { hospitalIds, operation } = req.body;
+    
+    if (!hospitalIds || !Array.isArray(hospitalIds) || hospitalIds.length === 0) {
+      return res.status(400).json({ error: 'Hospital IDs array is required' });
+    }
+    
+    if (!['validate', 'update_status', 'notify'].includes(operation)) {
+      return res.status(400).json({ error: 'Invalid operation' });
+    }
+    
+    const queuedMessages = [];
+    
+    for (const hospitalId of hospitalIds) {
+      try {
+        // Get hospital data
+        const getParams = {
+          TableName: tableName,
+          Key: { id: hospitalId }
+        };
+        
+        const hospitalResult = await dynamoDB.get(getParams).promise();
+        
+        if (hospitalResult.Item) {
+          const messageId = await sqsService.queueHospitalProcessing(
+            hospitalResult.Item, 
+            operation
+          );
+          queuedMessages.push({ hospitalId, messageId });
+        }
+      } catch (error) {
+        logger.error(`Failed to queue hospital ${hospitalId}`, { error: error.message });
+      }
+    }
+    
+    res.status(202).json({
+      message: 'Bulk processing queued',
+      queuedCount: queuedMessages.length,
+      totalRequested: hospitalIds.length,
+      queuedMessages: queuedMessages
+    });
+    
+  } catch (error) {
+    logger.error('Error in bulk processing:', error);
+    res.status(500).json({ error: 'Failed to queue bulk processing' });
+  }
+});
+
+// Process queue manually (for testing/admin)
+app.post('/admin/process-queue', async (req, res) => {
+  try {
+    const processedCount = await sqsService.processHospitalQueue();
+    
+    res.status(200).json({
+      message: 'Queue processing completed',
+      processedMessages: processedCount
+    });
+    
+  } catch (error) {
+    logger.error('Error processing queue:', error);
+    res.status(500).json({ error: 'Failed to process queue' });
   }
 });
 
