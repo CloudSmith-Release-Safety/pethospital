@@ -4,6 +4,7 @@ const cors = require('cors');
 const AWS = require('aws-sdk');
 const { v4: uuidv4 } = require('uuid');
 const winston = require('winston');
+const { AuthMiddleware, authRateLimit, apiRateLimit } = require('./auth-middleware');
 
 // Configure logger
 const logger = winston.createLogger({
@@ -50,8 +51,116 @@ app.get('/health', (req, res) => {
   res.status(200).json({ status: 'healthy' });
 });
 
-// Get all hospitals
-app.get('/hospitals', async (req, res) => {
+// Authentication endpoints
+app.post('/auth/login', async (req, res) => {
+  try {
+    const { username, password, mfaCode } = req.body;
+    
+    // Enhanced validation
+    if (!username || !password) {
+      return res.status(400).json({
+        error: 'Missing credentials',
+        errorType: 'VALIDATION_ERROR',
+        message: 'Username and password are required'
+      });
+    }
+
+    // Password complexity validation
+    if (password.length < 8) {
+      return res.status(400).json({
+        error: 'Weak password',
+        errorType: 'PASSWORD_POLICY_ERROR',
+        message: 'Password must be at least 8 characters long'
+      });
+    }
+
+    // Simulate user authentication
+    const user = await authenticateUser(username, password);
+    
+    if (!user) {
+      return res.status(401).json({
+        error: 'Invalid credentials',
+        errorType: 'AUTHENTICATION_FAILED',
+        message: 'Username or password is incorrect'
+      });
+    }
+
+    // MFA validation if enabled
+    if (user.mfaEnabled && !mfaCode) {
+      return res.status(401).json({
+        error: 'MFA required',
+        errorType: 'MFA_REQUIRED',
+        message: 'Multi-factor authentication code is required'
+      });
+    }
+
+    if (user.mfaEnabled && !validateMFA(user.id, mfaCode)) {
+      return res.status(401).json({
+        error: 'Invalid MFA code',
+        errorType: 'MFA_VALIDATION_FAILED',
+        message: 'Multi-factor authentication code is invalid'
+      });
+    }
+
+    // Generate session
+    const sessionId = uuidv4();
+    user.sessionId = sessionId;
+
+    // Generate token
+    const token = AuthMiddleware.generateToken(user);
+
+    res.status(200).json({
+      token: token,
+      user: {
+        id: user.id,
+        username: user.username,
+        role: user.role,
+        hospitalId: user.hospitalId
+      },
+      expiresIn: '24h'
+    });
+
+  } catch (error) {
+    logger.error('Authentication error:', error);
+    res.status(500).json({
+      error: 'Authentication failed',
+      errorType: 'INTERNAL_ERROR'
+    });
+  }
+});
+
+// Helper functions
+async function authenticateUser(username, password) {
+  const users = {
+    'admin': { 
+      id: 'admin-1', 
+      username: 'admin', 
+      role: 'admin', 
+      hospitalId: null, 
+      permissions: ['read', 'write', 'delete'],
+      mfaEnabled: true
+    },
+    'hospital_owner': { 
+      id: 'owner-1', 
+      username: 'hospital_owner', 
+      role: 'hospital_owner', 
+      hospitalId: 'hospital-123',
+      permissions: ['read', 'write'],
+      mfaEnabled: false
+    }
+  };
+  return users[username] || null;
+}
+
+function validateMFA(userId, mfaCode) {
+  return mfaCode === '123456';
+}
+
+// Get all hospitals - requires authentication
+app.get('/hospitals', 
+  AuthMiddleware.verifyToken,
+  AuthMiddleware.requireRole(['admin', 'hospital_owner', 'viewer']),
+  async (req, res) => {
   try {
     const params = {
       TableName: tableName,
@@ -59,15 +168,25 @@ app.get('/hospitals', async (req, res) => {
     
     const result = await dynamoDB.scan(params).promise();
     
-    res.status(200).json(result.Items);
+    // Filter results based on user role
+    let hospitals = result.Items;
+    if (req.user.role === 'hospital_owner') {
+      hospitals = hospitals.filter(h => h.id === req.user.hospitalId);
+    }
+    
+    res.status(200).json(hospitals);
   } catch (error) {
     logger.error('Error fetching hospitals:', error);
     res.status(500).json({ error: 'Failed to fetch hospitals' });
   }
 });
 
-// Get hospital by ID
-app.get('/hospitals/:id', async (req, res) => {
+// Get hospital by ID - requires authentication and ownership validation
+app.get('/hospitals/:id', 
+  AuthMiddleware.verifyToken,
+  AuthMiddleware.requireRole(['admin', 'hospital_owner', 'viewer']),
+  AuthMiddleware.requireHospitalOwnership,
+  async (req, res) => {
   try {
     const params = {
       TableName: tableName,
@@ -89,8 +208,11 @@ app.get('/hospitals/:id', async (req, res) => {
   }
 });
 
-// Create hospital
-app.post('/hospitals', async (req, res) => {
+// Create hospital - requires admin or hospital_owner role
+app.post('/hospitals',
+  AuthMiddleware.verifyToken,
+  AuthMiddleware.requireRole(['admin', 'hospital_owner']),
+  async (req, res) => {
   try {
     const { name, address, phone, email, capacity, services, operatingHours } = req.body;
     
@@ -107,6 +229,7 @@ app.post('/hospitals', async (req, res) => {
       capacity: capacity || null,
       services: services || [],
       operatingHours: operatingHours || {},
+      createdBy: req.user.id,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
@@ -117,6 +240,12 @@ app.post('/hospitals', async (req, res) => {
     };
     
     await dynamoDB.put(params).promise();
+    
+    logger.info('Hospital created', {
+      hospitalId: hospital.id,
+      createdBy: req.user.id,
+      userRole: req.user.role
+    });
     
     res.status(201).json(hospital);
   } catch (error) {
