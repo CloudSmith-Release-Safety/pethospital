@@ -4,6 +4,7 @@ const cors = require('cors');
 const AWS = require('aws-sdk');
 const { v4: uuidv4 } = require('uuid');
 const winston = require('winston');
+const cacheService = require('./cache-service');
 
 // Configure logger
 const logger = winston.createLogger({
@@ -50,46 +51,99 @@ app.get('/health', (req, res) => {
   res.status(200).json({ status: 'healthy' });
 });
 
-// Get all hospitals
+// Get all hospitals with caching
 app.get('/hospitals', async (req, res) => {
   try {
-    const params = {
-      TableName: tableName,
-    };
+    const { location, services, capacity } = req.query;
+    const filters = JSON.stringify({ location, services, capacity });
+    const cacheKey = cacheService.constructor.keys.hospitalList(filters);
     
-    const result = await dynamoDB.scan(params).promise();
+    // Try to get from cache first
+    const cachedHospitals = await cacheService.getOrSet(
+      cacheKey,
+      async () => {
+        logger.info('Fetching hospitals from database', { filters });
+        
+        const params = {
+          TableName: tableName,
+        };
+        
+        const result = await dynamoDB.scan(params).promise();
+        let hospitals = result.Items;
+        
+        // Apply filters if provided
+        if (services) {
+          const serviceList = services.split(',');
+          hospitals = hospitals.filter(h => 
+            serviceList.some(service => h.services?.includes(service))
+          );
+        }
+        
+        if (capacity) {
+          const minCapacity = parseInt(capacity);
+          hospitals = hospitals.filter(h => h.capacity >= minCapacity);
+        }
+        
+        return hospitals;
+      },
+      cacheService.constructor.TTL.HOSPITAL_LIST
+    );
     
-    res.status(200).json(result.Items);
+    logger.info('Hospitals retrieved', { 
+      count: cachedHospitals.length, 
+      cached: true,
+      filters 
+    });
+    
+    res.status(200).json(cachedHospitals);
   } catch (error) {
     logger.error('Error fetching hospitals:', error);
     res.status(500).json({ error: 'Failed to fetch hospitals' });
   }
 });
 
-// Get hospital by ID
+// Get hospital by ID with caching
 app.get('/hospitals/:id', async (req, res) => {
   try {
-    const params = {
-      TableName: tableName,
-      Key: {
-        id: req.params.id,
+    const hospitalId = req.params.id;
+    const cacheKey = cacheService.constructor.keys.hospital(hospitalId);
+    
+    // Try to get from cache first
+    const hospital = await cacheService.getOrSet(
+      cacheKey,
+      async () => {
+        logger.info('Fetching hospital from database', { hospitalId });
+        
+        const params = {
+          TableName: tableName,
+          Key: {
+            id: hospitalId,
+          },
+        };
+        
+        const result = await dynamoDB.get(params).promise();
+        return result.Item || null;
       },
-    };
+      cacheService.constructor.TTL.HOSPITAL_DETAILS
+    );
     
-    const result = await dynamoDB.get(params).promise();
-    
-    if (!result.Item) {
+    if (!hospital) {
       return res.status(404).json({ error: 'Hospital not found' });
     }
     
-    res.status(200).json(result.Item);
+    logger.info('Hospital retrieved', { 
+      hospitalId, 
+      cached: true 
+    });
+    
+    res.status(200).json(hospital);
   } catch (error) {
     logger.error(`Error fetching hospital ${req.params.id}:`, error);
     res.status(500).json({ error: 'Failed to fetch hospital' });
   }
 });
 
-// Create hospital
+// Create hospital with cache invalidation
 app.post('/hospitals', async (req, res) => {
   try {
     const { name, address, phone, email, capacity, services, operatingHours } = req.body;
@@ -117,6 +171,23 @@ app.post('/hospitals', async (req, res) => {
     };
     
     await dynamoDB.put(params).promise();
+    
+    // Cache the new hospital
+    const hospitalCacheKey = cacheService.constructor.keys.hospital(hospital.id);
+    await cacheService.set(
+      hospitalCacheKey, 
+      hospital, 
+      cacheService.constructor.TTL.HOSPITAL_DETAILS
+    );
+    
+    // Invalidate hospital list caches
+    await cacheService.deletePattern('hospitals:list:*');
+    await cacheService.deletePattern('search:*');
+    
+    logger.info('Hospital created and cached', { 
+      hospitalId: hospital.id,
+      cacheInvalidated: true 
+    });
     
     res.status(201).json(hospital);
   } catch (error) {
@@ -176,13 +247,15 @@ app.put('/hospitals/:id', async (req, res) => {
   }
 });
 
-// Delete hospital
+// Delete hospital with cache invalidation
 app.delete('/hospitals/:id', async (req, res) => {
   try {
+    const hospitalId = req.params.id;
+    
     const params = {
       TableName: tableName,
       Key: {
-        id: req.params.id,
+        id: hospitalId,
       },
       ReturnValues: 'ALL_OLD',
     };
@@ -193,10 +266,94 @@ app.delete('/hospitals/:id', async (req, res) => {
       return res.status(404).json({ error: 'Hospital not found' });
     }
     
+    // Invalidate caches
+    await cacheService.delete(cacheService.constructor.keys.hospital(hospitalId));
+    await cacheService.deletePattern('hospitals:list:*');
+    await cacheService.deletePattern('search:*');
+    
+    logger.info('Hospital deleted and cache invalidated', { hospitalId });
+    
     res.status(200).json({ message: 'Hospital deleted successfully' });
   } catch (error) {
     logger.error(`Error deleting hospital ${req.params.id}:`, error);
     res.status(500).json({ error: 'Failed to delete hospital' });
+  }
+});
+
+// Search hospitals with caching
+app.get('/hospitals/search/:query', async (req, res) => {
+  try {
+    const query = req.params.query.toLowerCase();
+    const cacheKey = cacheService.constructor.keys.searchResults(query);
+    
+    const searchResults = await cacheService.getOrSet(
+      cacheKey,
+      async () => {
+        logger.info('Performing hospital search', { query });
+        
+        const params = {
+          TableName: tableName,
+        };
+        
+        const result = await dynamoDB.scan(params).promise();
+        
+        // Filter hospitals by search query
+        const filteredHospitals = result.Items.filter(hospital => 
+          hospital.name.toLowerCase().includes(query) ||
+          hospital.address.toLowerCase().includes(query) ||
+          (hospital.services && hospital.services.some(service => 
+            service.toLowerCase().includes(query)
+          ))
+        );
+        
+        return filteredHospitals;
+      },
+      cacheService.constructor.TTL.SEARCH_RESULTS
+    );
+    
+    logger.info('Search completed', { 
+      query, 
+      resultCount: searchResults.length,
+      cached: true 
+    });
+    
+    res.status(200).json(searchResults);
+  } catch (error) {
+    logger.error('Error searching hospitals:', error);
+    res.status(500).json({ error: 'Failed to search hospitals' });
+  }
+});
+
+// Cache management endpoints
+app.get('/admin/cache/stats', async (req, res) => {
+  try {
+    const stats = await cacheService.getStats();
+    res.status(200).json(stats);
+  } catch (error) {
+    logger.error('Error getting cache stats:', error);
+    res.status(500).json({ error: 'Failed to get cache statistics' });
+  }
+});
+
+app.delete('/admin/cache/clear', async (req, res) => {
+  try {
+    const { pattern } = req.query;
+    
+    if (pattern) {
+      await cacheService.deletePattern(pattern);
+      logger.info('Cache pattern cleared', { pattern });
+      res.status(200).json({ message: `Cache pattern '${pattern}' cleared` });
+    } else {
+      // Clear all hospital-related caches
+      await cacheService.deletePattern('hospital:*');
+      await cacheService.deletePattern('hospitals:*');
+      await cacheService.deletePattern('search:*');
+      logger.info('All hospital caches cleared');
+      res.status(200).json({ message: 'All hospital caches cleared' });
+    }
+  } catch (error) {
+    logger.error('Error clearing cache:', error);
+    res.status(500).json({ error: 'Failed to clear cache' });
   }
 });
 
