@@ -4,6 +4,7 @@ const cors = require('cors');
 const AWS = require('aws-sdk');
 const { v4: uuidv4 } = require('uuid');
 const winston = require('winston');
+const { ERROR_CODES, createErrorResponse } = require('./errors');
 
 // Configure logger
 const logger = winston.createLogger({
