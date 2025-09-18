@@ -4,6 +4,7 @@ const cors = require('cors');
 const AWS = require('aws-sdk');
 const { v4: uuidv4 } = require('uuid');
 const winston = require('winston');
+const { ERROR_CODES, createErrorResponse } = require('./errors');
 
 // Configure logger
 const logger = winston.createLogger({
@@ -62,7 +63,7 @@ app.get('/doctors', async (req, res) => {
     res.status(200).json(result.Items);
   } catch (error) {
     logger.error('Error fetching doctors:', error);
-    res.status(500).json({ error: 'Failed to fetch doctors' });
+    res.status(500).json(createErrorResponse(ERROR_CODES.DATABASE_ERROR, 'Failed to fetch doctors', error.message));
   }
 });
 
@@ -79,13 +80,13 @@ app.get('/doctors/:id', async (req, res) => {
     const result = await dynamoDB.get(params).promise();
     
     if (!result.Item) {
-      return res.status(404).json({ error: 'Doctor not found' });
+      return res.status(404).json(createErrorResponse(ERROR_CODES.DOCTOR_NOT_FOUND, 'Doctor not found', `No doctor found with ID: ${req.params.id}`));
     }
     
     res.status(200).json(result.Item);
   } catch (error) {
     logger.error(`Error fetching doctor ${req.params.id}:`, error);
-    res.status(500).json({ error: 'Failed to fetch doctor' });
+    res.status(500).json(createErrorResponse(ERROR_CODES.DATABASE_ERROR, 'Failed to fetch doctor', error.message));
   }
 });
 
@@ -95,7 +96,7 @@ app.post('/doctors', async (req, res) => {
     const { firstName, lastName, specialization, hospitalId, email, phone, licenseNumber } = req.body;
     
     if (!firstName || !lastName || !specialization || !hospitalId || !licenseNumber) {
-      return res.status(400).json({ error: 'Missing required fields' });
+      return res.status(400).json(createErrorResponse(ERROR_CODES.MISSING_REQUIRED_FIELDS, 'Missing required fields', 'firstName, lastName, specialization, hospitalId, and licenseNumber are required'));
     }
     
     const doctor = {

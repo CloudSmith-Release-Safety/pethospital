@@ -4,6 +4,7 @@ const cors = require('cors');
 const AWS = require('aws-sdk');
 const { v4: uuidv4 } = require('uuid');
 const winston = require('winston');
+const { ERROR_CODES, createErrorResponse } = require('./errors');
 
 // Configure logger
 const logger = winston.createLogger({
@@ -62,7 +63,7 @@ app.get('/pets', async (req, res) => {
     res.status(200).json(result.Items);
   } catch (error) {
     logger.error('Error fetching pets:', error);
-    res.status(500).json({ error: 'Failed to fetch pets' });
+    res.status(500).json(createErrorResponse(ERROR_CODES.DATABASE_ERROR, 'Failed to fetch pets', error.message));
   }
 });
 
@@ -79,13 +80,13 @@ app.get('/pets/:id', async (req, res) => {
     const result = await dynamoDB.get(params).promise();
     
     if (!result.Item) {
-      return res.status(404).json({ error: 'Pet not found' });
+      return res.status(404).json(createErrorResponse(ERROR_CODES.PET_NOT_FOUND, 'Pet not found', `No pet found with ID: ${req.params.id}`));
     }
     
     res.status(200).json(result.Item);
   } catch (error) {
     logger.error(`Error fetching pet ${req.params.id}:`, error);
-    res.status(500).json({ error: 'Failed to fetch pet' });
+    res.status(500).json(createErrorResponse(ERROR_CODES.DATABASE_ERROR, 'Failed to fetch pet', error.message));
   }
 });
 
@@ -95,7 +96,7 @@ app.post('/pets', async (req, res) => {
     const { name, species, breed, age, ownerName, ownerContact } = req.body;
     
     if (!name || !species || !ownerName || !ownerContact) {
-      return res.status(400).json({ error: 'Missing required fields' });
+      return res.status(400).json(createErrorResponse(ERROR_CODES.MISSING_REQUIRED_FIELDS, 'Missing required fields', 'name, species, ownerName, and ownerContact are required'));
     }
     
     const pet = {
@@ -120,7 +121,7 @@ app.post('/pets', async (req, res) => {
     res.status(201).json(pet);
   } catch (error) {
     logger.error('Error creating pet:', error);
-    res.status(500).json({ error: 'Failed to create pet' });
+    res.status(500).json(createErrorResponse(ERROR_CODES.DATABASE_ERROR, 'Failed to create pet', error.message));
   }
 });
 
@@ -140,7 +141,7 @@ app.put('/pets/:id', async (req, res) => {
     const existingPet = await dynamoDB.get(getParams).promise();
     
     if (!existingPet.Item) {
-      return res.status(404).json({ error: 'Pet not found' });
+      return res.status(404).json(createErrorResponse(ERROR_CODES.PET_NOT_FOUND, 'Pet not found', `No pet found with ID: ${req.params.id}`));
     }
     
     // Update pet
@@ -170,7 +171,7 @@ app.put('/pets/:id', async (req, res) => {
     res.status(200).json(result.Attributes);
   } catch (error) {
     logger.error(`Error updating pet ${req.params.id}:`, error);
-    res.status(500).json({ error: 'Failed to update pet' });
+    res.status(500).json(createErrorResponse(ERROR_CODES.DATABASE_ERROR, 'Failed to update pet', error.message));
   }
 });
 
@@ -188,13 +189,13 @@ app.delete('/pets/:id', async (req, res) => {
     const result = await dynamoDB.delete(params).promise();
     
     if (!result.Attributes) {
-      return res.status(404).json({ error: 'Pet not found' });
+      return res.status(404).json(createErrorResponse(ERROR_CODES.PET_NOT_FOUND, 'Pet not found', `No pet found with ID: ${req.params.id}`));
     }
     
     res.status(200).json({ message: 'Pet deleted successfully' });
   } catch (error) {
     logger.error(`Error deleting pet ${req.params.id}:`, error);
-    res.status(500).json({ error: 'Failed to delete pet' });
+    res.status(500).json(createErrorResponse(ERROR_CODES.DATABASE_ERROR, 'Failed to delete pet', error.message));
   }
 });
 
