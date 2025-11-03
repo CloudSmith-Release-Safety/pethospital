@@ -1,3 +1,9 @@
+variable "alert_email" {
+  description = "Email address for critical alerts"
+  type        = string
+  default     = ""
+}
+
 variable "cluster_name" {
   description = "Name of the EKS cluster"
   type        = string
