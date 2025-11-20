@@ -17,6 +17,7 @@ import PetsIcon from '@mui/icons-material/Pets';
 import LocalHospitalIcon from '@mui/icons-material/LocalHospital';
 import PersonIcon from '@mui/icons-material/Person';
 import EventNoteIcon from '@mui/icons-material/EventNote';
+import SecurityIcon from '@mui/icons-material/Security';
 import axios from 'axios';
 
 function Dashboard() {
@@ -25,6 +26,7 @@ function Dashboard() {
     hospitals: { count: 0, loading: true, error: null },
     doctors: { count: 0, loading: true, error: null },
     visits: { count: 0, loading: true, error: null },
+    insurance: { count: 0, loading: true, error: null }
   });
 
   useEffect(() => {
@@ -80,6 +82,19 @@ function Dashboard() {
           visits: { count: 0, loading: false, error: 'Failed to fetch visits' }
         }));
       }
+
+      try {
+        const insuranceResponse = await axios.get('/api/insurance');
+        setStats(prev => ({
+          ...prev,
+          insurance: { count: insuranceResponse.data.length, loading: false, error: null }
+        }));
+      } catch (err) {
+        setStats(prev => ({
+          ...prev,
+          insurance: { count: 0, loading: false, error: 'Failed to fetch insurance policies' }
+        }));
+      }
     };
 
     fetchStats();
@@ -122,6 +137,15 @@ function Dashboard() {
       link: '/visits',
       color: '#4caf50',
     },
+    {
+      title: 'Insurance',
+      icon: <SecurityIcon sx={{ fontSize: 40 }} />,
+      count: stats.insurance.count,
+      loading: stats.insurance.loading,
+      error: stats.insurance.error,
+      link: '/insurance',
+      color: '#ff9800',
+    }
   ];
 
   return (
@@ -132,7 +156,7 @@ function Dashboard() {
 
       <Grid container spacing={3}>
         {statCards.map((card) => (
-          <Grid item xs={12} sm={6} md={3} key={card.title}>
+          <Grid item xs={12} sm={6} md={card.title === 'Insurance' ? 12 : 3} key={card.title}>
             <Paper
               elevation={3}
               sx={{
@@ -229,11 +253,12 @@ function Dashboard() {
                 <Grid item xs={6}>
                   <Button
                     component={RouterLink}
-                    to="/billing"
+                    to="/insurance"
                     variant="outlined"
                     fullWidth
+                    startIcon={<SecurityIcon />}
                   >
-                    Create Invoice
+                    Add Insurance
                   </Button>
                 </Grid>
               </Grid>
