@@ -100,6 +100,132 @@ resource "aws_cloudwatch_dashboard" "this" {
           region = data.aws_region.current.name
           title  = "Node Memory Utilization"
         }
+      },
+      {
+        type   = "metric"
+        x      = 0
+        y      = 18
+        width  = 12
+        height = 6
+        properties = {
+          metrics = [
+            ["AWS/DynamoDB", "ConsumedReadCapacityUnits", "TableName", "${var.prefix}-pets"],
+            ["AWS/DynamoDB", "ConsumedReadCapacityUnits", "TableName", "${var.prefix}-hospitals"],
+            ["AWS/DynamoDB", "ConsumedReadCapacityUnits", "TableName", "${var.prefix}-doctors"]
+          ]
+          period = 300
+          stat   = "Sum"
+          region = data.aws_region.current.name
+          title  = "DynamoDB Read Capacity"
+        }
+      },
+      {
+        type   = "metric"
+        x      = 12
+        y      = 18
+        width  = 12
+        height = 6
+        properties = {
+          metrics = [
+            ["AWS/DynamoDB", "ConsumedWriteCapacityUnits", "TableName", "${var.prefix}-pets"],
+            ["AWS/DynamoDB", "ConsumedWriteCapacityUnits", "TableName", "${var.prefix}-hospitals"],
+            ["AWS/DynamoDB", "ConsumedWriteCapacityUnits", "TableName", "${var.prefix}-doctors"]
+          ]
+          period = 300
+          stat   = "Sum"
+          region = data.aws_region.current.name
+          title  = "DynamoDB Write Capacity"
+        }
+      },
+      {
+        type   = "metric"
+        x      = 0
+        y      = 24
+        width  = 12
+        height = 6
+        properties = {
+          metrics = [
+            ["AWS/DynamoDB", "SuccessfulRequestLatency", "TableName", "${var.prefix}-pets", "Operation", "GetItem"],
+            ["AWS/DynamoDB", "SuccessfulRequestLatency", "TableName", "${var.prefix}-hospitals", "Operation", "GetItem"],
+            ["AWS/DynamoDB", "SuccessfulRequestLatency", "TableName", "${var.prefix}-doctors", "Operation", "GetItem"]
+          ]
+          period = 300
+          stat   = "Average"
+          region = data.aws_region.current.name
+          title  = "DynamoDB Read Latency"
+        }
+      },
+      {
+        type   = "metric"
+        x      = 12
+        y      = 24
+        width  = 12
+        height = 6
+        properties = {
+          metrics = [
+            ["AWS/DynamoDB", "SuccessfulRequestLatency", "TableName", "${var.prefix}-pets", "Operation", "PutItem"],
+            ["AWS/DynamoDB", "SuccessfulRequestLatency", "TableName", "${var.prefix}-hospitals", "Operation", "PutItem"],
+            ["AWS/DynamoDB", "SuccessfulRequestLatency", "TableName", "${var.prefix}-doctors", "Operation", "PutItem"]
+          ]
+          period = 300
+          stat   = "Average"
+          region = data.aws_region.current.name
+          title  = "DynamoDB Write Latency"
+        }
+      },
+      {
+        type   = "metric"
+        x      = 0
+        y      = 30
+        width  = 12
+        height = 6
+        properties = {
+          metrics = [
+            ["AWS/DynamoDB", "ThrottledRequests", "TableName", "${var.prefix}-pets"],
+            ["AWS/DynamoDB", "ThrottledRequests", "TableName", "${var.prefix}-hospitals"],
+            ["AWS/DynamoDB", "ThrottledRequests", "TableName", "${var.prefix}-doctors"]
+          ]
+          period = 300
+          stat   = "Sum"
+          region = data.aws_region.current.name
+          title  = "DynamoDB Throttled Requests"
+        }
+      },
+      {
+        type   = "metric"
+        x      = 12
+        y      = 30
+        width  = 12
+        height = 6
+        properties = {
+          metrics = [
+            ["AWS/DynamoDB", "SystemErrors", "TableName", "${var.prefix}-pets"],
+            ["AWS/DynamoDB", "SystemErrors", "TableName", "${var.prefix}-hospitals"],
+            ["AWS/DynamoDB", "SystemErrors", "TableName", "${var.prefix}-doctors"]
+          ]
+          period = 300
+          stat   = "Sum"
+          region = data.aws_region.current.name
+          title  = "DynamoDB System Errors"
+        }
+      },
+      {
+        type   = "metric"
+        x      = 0
+        y      = 36
+        width  = 24
+        height = 6
+        properties = {
+          metrics = [
+            ["Custom/Database", "ConnectionPoolUtilization", "Service", "pet-service"],
+            ["Custom/Database", "ConnectionPoolUtilization", "Service", "hospital-service"],
+            ["Custom/Database", "ConnectionPoolUtilization", "Service", "doctor-service"]
+          ]
+          period = 60
+          stat   = "Average"
+          region = data.aws_region.current.name
+          title  = "Connection Pool Utilization"
+        }
       }
     ]
   })
@@ -255,6 +381,69 @@ resource "aws_cloudwatch_metric_alarm" "container_insights_node_disk" {
   tags = var.tags
 }
 
+# DynamoDB Connection Pool Utilization Alarm
+resource "aws_cloudwatch_metric_alarm" "db_connection_utilization" {
+  alarm_name          = "${var.cluster_name}-db-connection-utilization"
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = 2
+  metric_name         = "ConnectionPoolUtilization"
+  namespace           = "Custom/Database"
+  period              = 60
+  statistic           = "Average"
+  threshold           = var.db_connection_utilization_threshold
+  alarm_description   = "This metric monitors database connection pool utilization"
+  alarm_actions       = var.alarm_actions
+  ok_actions          = var.ok_actions
+  
+  dimensions = {
+    Service = "pet-service"
+  }
+  
+  tags = var.tags
+}
+
+# DynamoDB Operation Latency Alarm
+resource "aws_cloudwatch_metric_alarm" "db_operation_latency" {
+  alarm_name          = "${var.cluster_name}-db-operation-latency"
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = 2
+  metric_name         = "SuccessfulRequestLatency"
+  namespace           = "AWS/DynamoDB"
+  period              = 60
+  statistic           = "Average"
+  threshold           = var.db_operation_latency_threshold
+  alarm_description   = "This metric monitors database operation latency"
+  alarm_actions       = var.alarm_actions
+  ok_actions          = var.ok_actions
+  
+  dimensions = {
+    TableName = "${var.prefix}-pets"
+    Operation = "GetItem"
+  }
+  
+  tags = var.tags
+}
+
+# DynamoDB Throttled Requests Alarm
+resource "aws_cloudwatch_metric_alarm" "db_throttled_requests" {
+  alarm_name          = "${var.cluster_name}-db-throttled-requests"
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = 2
+  metric_name         = "ThrottledRequests"
+  namespace           = "AWS/DynamoDB"
+  period              = 60
+  statistic           = "Sum"
+  threshold           = var.db_throttled_requests_threshold
+  alarm_description   = "This metric monitors database throttled requests"
+  alarm_actions       = var.alarm_actions
+  ok_actions          = var.ok_actions
+  
+  dimensions = {
+    TableName = "${var.prefix}-pets"
+  }
+  
+  tags = var.tags
+}
 # Container Insights - Node Network Utilization Alarm
 resource "aws_cloudwatch_metric_alarm" "container_insights_node_network" {
   alarm_name          = "${var.cluster_name}-node-network-utilization"

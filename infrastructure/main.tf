@@ -139,6 +139,14 @@ module "dynamodb" {
     }
   ]
 
+  connection_pool_config = {
+    max_connections = var.db_max_connections
+    min_connections = var.db_min_connections
+    idle_timeout_ms = var.db_idle_timeout_ms
+    connection_timeout_ms = var.db_connection_timeout_ms
+    max_pending_requests = var.db_max_pending_requests
+  }
+
   tags = {
     Environment = local.environment
     Project     = local.prefix
@@ -178,6 +186,9 @@ module "monitoring" {
   error_rate_threshold      = var.error_rate_threshold
   cpu_utilization_threshold = var.cpu_utilization_threshold
   memory_utilization_threshold = var.memory_utilization_threshold
+  db_connection_utilization_threshold = var.db_connection_utilization_threshold
+  db_operation_latency_threshold = var.db_operation_latency_threshold
+  db_throttled_requests_threshold = var.db_throttled_requests_threshold
   
   alarm_actions = var.alarm_actions
   ok_actions    = var.ok_actions

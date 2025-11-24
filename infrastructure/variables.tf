@@ -115,6 +115,55 @@ variable "ok_actions" {
   default     = []
 }
 
+# Database Connection Pool Configuration
+variable "db_max_connections" {
+  description = "Maximum number of connections in the DynamoDB connection pool"
+  type        = number
+  default     = 500
+}
+
+variable "db_min_connections" {
+  description = "Minimum number of connections in the DynamoDB connection pool"
+  type        = number
+  default     = 50
+}
+
+variable "db_idle_timeout_ms" {
+  description = "Idle timeout for connections in milliseconds"
+  type        = number
+  default     = 60000
+}
+
+variable "db_connection_timeout_ms" {
+  description = "Connection timeout in milliseconds"
+  type        = number
+  default     = 5000
+}
+
+variable "db_max_pending_requests" {
+  description = "Maximum number of pending connection requests"
+  type        = number
+  default     = 1000
+}
+
+# Database Monitoring Configuration
+variable "db_connection_utilization_threshold" {
+  description = "Threshold for database connection utilization alarm in percentage"
+  type        = number
+  default     = 80
+}
+
+variable "db_operation_latency_threshold" {
+  description = "Threshold for database operation latency alarm in milliseconds"
+  type        = number
+  default     = 100
+}
+
+variable "db_throttled_requests_threshold" {
+  description = "Threshold for throttled database requests"
+  type        = number
+  default     = 10
+}
 # Git Repository Configuration
 variable "git_repository_url" {
   description = "URL of the Git repository containing the application code"
