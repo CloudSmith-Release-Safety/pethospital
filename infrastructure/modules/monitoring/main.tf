@@ -1,4 +1,45 @@
 resource "aws_cloudwatch_dashboard" "this" {
+# Feature Flag Latency Alarm
+resource "aws_cloudwatch_metric_alarm" "feature_flag_latency" {
+  alarm_name          = "${var.cluster_name}-feature-flag-latency"
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = 2
+  metric_name         = "FeatureFlagLatency"
+  namespace           = "${var.prefix}"
+  period              = 60
+  statistic           = "Average"
+  threshold           = var.feature_flag_latency_threshold
+  alarm_description   = "This metric monitors feature flag evaluation latency"
+  alarm_actions       = var.alarm_actions
+  ok_actions          = var.ok_actions
+  
+  dimensions = {
+    Service = "pet-service"
+  }
+  
+  tags = var.tags
+}
+
+# Feature Flag Errors Alarm
+resource "aws_cloudwatch_metric_alarm" "feature_flag_errors" {
+  alarm_name          = "${var.cluster_name}-feature-flag-errors"
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = 2
+  metric_name         = "FeatureFlagErrors"
+  namespace           = "${var.prefix}"
+  period              = 60
+  statistic           = "Sum"
+  threshold           = var.feature_flag_error_threshold
+  alarm_description   = "This metric monitors feature flag evaluation errors"
+  alarm_actions       = var.alarm_actions
+  ok_actions          = var.ok_actions
+  
+  dimensions = {
+    Service = "pet-service"
+  }
+  
+  tags = var.tags
+}
   dashboard_name = "${var.cluster_name}-dashboard"
 
   dashboard_body = jsonencode({
@@ -99,6 +140,202 @@ resource "aws_cloudwatch_dashboard" "this" {
           stat   = "Average"
           region = data.aws_region.current.name
           title  = "Node Memory Utilization"
+        }
+      },
+      {
+        type   = "metric"
+        x      = 0
+        y      = 18
+        width  = 12
+        height = 6
+        properties = {
+          metrics = [
+            ["AWS/DynamoDB", "ConsumedReadCapacityUnits", "TableName", "${var.prefix}-pets"],
+            ["AWS/DynamoDB", "ConsumedReadCapacityUnits", "TableName", "${var.prefix}-hospitals"],
+            ["AWS/DynamoDB", "ConsumedReadCapacityUnits", "TableName", "${var.prefix}-doctors"]
+          ]
+          period = 300
+          stat   = "Sum"
+          region = data.aws_region.current.name
+          title  = "DynamoDB Read Capacity"
+        }
+      },
+      {
+        type   = "metric"
+        x      = 12
+        y      = 18
+        width  = 12
+        height = 6
+        properties = {
+          metrics = [
+            ["AWS/DynamoDB", "ConsumedWriteCapacityUnits", "TableName", "${var.prefix}-pets"],
+            ["AWS/DynamoDB", "ConsumedWriteCapacityUnits", "TableName", "${var.prefix}-hospitals"],
+            ["AWS/DynamoDB", "ConsumedWriteCapacityUnits", "TableName", "${var.prefix}-doctors"]
+          ]
+          period = 300
+          stat   = "Sum"
+          region = data.aws_region.current.name
+          title  = "DynamoDB Write Capacity"
+        }
+      },
+      {
+        type   = "metric"
+        x      = 0
+        y      = 24
+        width  = 12
+        height = 6
+        properties = {
+          metrics = [
+            ["AWS/DynamoDB", "SuccessfulRequestLatency", "TableName", "${var.prefix}-pets", "Operation", "GetItem"],
+            ["AWS/DynamoDB", "SuccessfulRequestLatency", "TableName", "${var.prefix}-hospitals", "Operation", "GetItem"],
+            ["AWS/DynamoDB", "SuccessfulRequestLatency", "TableName", "${var.prefix}-doctors", "Operation", "GetItem"]
+          ]
+          period = 300
+          stat   = "Average"
+          region = data.aws_region.current.name
+          title  = "DynamoDB Read Latency"
+        }
+      },
+      {
+        type   = "metric"
+        x      = 12
+        y      = 24
+        width  = 12
+        height = 6
+        properties = {
+          metrics = [
+            ["AWS/DynamoDB", "SuccessfulRequestLatency", "TableName", "${var.prefix}-pets", "Operation", "PutItem"],
+            ["AWS/DynamoDB", "SuccessfulRequestLatency", "TableName", "${var.prefix}-hospitals", "Operation", "PutItem"],
+            ["AWS/DynamoDB", "SuccessfulRequestLatency", "TableName", "${var.prefix}-doctors", "Operation", "PutItem"]
+          ]
+          period = 300
+          stat   = "Average"
+          region = data.aws_region.current.name
+          title  = "DynamoDB Write Latency"
+        }
+      },
+      {
+        type   = "metric"
+        x      = 0
+        y      = 30
+        width  = 12
+        height = 6
+        properties = {
+          metrics = [
+            ["AWS/DynamoDB", "ThrottledRequests", "TableName", "${var.prefix}-pets"],
+            ["AWS/DynamoDB", "ThrottledRequests", "TableName", "${var.prefix}-hospitals"],
+            ["AWS/DynamoDB", "ThrottledRequests", "TableName", "${var.prefix}-doctors"]
+          ]
+          period = 300
+          stat   = "Sum"
+          region = data.aws_region.current.name
+          title  = "DynamoDB Throttled Requests"
+        }
+      },
+      {
+        type   = "metric"
+        x      = 12
+        y      = 30
+        width  = 12
+        height = 6
+        properties = {
+          metrics = [
+            ["AWS/DynamoDB", "SystemErrors", "TableName", "${var.prefix}-pets"],
+            ["AWS/DynamoDB", "SystemErrors", "TableName", "${var.prefix}-hospitals"],
+            ["AWS/DynamoDB", "SystemErrors", "TableName", "${var.prefix}-doctors"]
+          ]
+          period = 300
+          stat   = "Sum"
+          region = data.aws_region.current.name
+          title  = "DynamoDB System Errors"
+        }
+      },
+      {
+        type   = "metric"
+        x      = 0
+        y      = 36
+        width  = 24
+        height = 6
+        properties = {
+          metrics = [
+            ["Custom/Database", "ConnectionPoolUtilization", "Service", "pet-service"],
+            ["Custom/Database", "ConnectionPoolUtilization", "Service", "hospital-service"],
+            ["Custom/Database", "ConnectionPoolUtilization", "Service", "doctor-service"]
+          ]
+          period = 60
+          stat   = "Average"
+          region = data.aws_region.current.name
+          title  = "Connection Pool Utilization"
+        }
+      },
+      {
+        type   = "metric"
+        x      = 0
+        y      = 42
+        width  = 12
+        height = 6
+        properties = {
+          metrics = [
+            ["Custom/Cache", "CacheHitRate", "ClusterName", var.cluster_name, "CacheId", "${var.prefix}-cache"]
+          ]
+          period = 60
+          stat   = "Average"
+          region = data.aws_region.current.name
+          title  = "Cache Hit Rate"
+          yAxis = {
+            left = {
+              min = 0
+              max = 100
+            }
+          }
+        }
+      },
+      {
+        type   = "metric"
+        x      = 12
+        y      = 42
+        width  = 12
+        height = 6
+        properties = {
+          metrics = [
+            ["Custom/Cache", "CacheLatency", "ClusterName", var.cluster_name, "CacheId", "${var.prefix}-cache"]
+          ]
+          period = 60
+          stat   = "Average"
+          region = data.aws_region.current.name
+          title  = "Cache Latency (ms)"
+        }
+      },
+      {
+        type   = "metric"
+        x      = 0
+        y      = 48
+        width  = 12
+        height = 6
+        properties = {
+          metrics = [
+            ["Custom/Cache", "CacheHealthCheckFailures", "ClusterName", var.cluster_name, "CacheId", "${var.prefix}-cache"]
+          ]
+          period = 60
+          stat   = "Maximum"
+          region = data.aws_region.current.name
+          title  = "Cache Health Check Failures"
+        }
+      },
+      {
+        type   = "metric"
+        x      = 12
+        y      = 48
+        width  = 12
+        height = 6
+        properties = {
+          metrics = [
+            ["Custom/Cache", "CacheEvictionRate", "ClusterName", var.cluster_name, "CacheId", "${var.prefix}-cache"]
+          ]
+          period = 60
+          stat   = "Average"
+          region = data.aws_region.current.name
+          title  = "Cache Eviction Rate"
         }
       }
     ]
@@ -255,6 +492,69 @@ resource "aws_cloudwatch_metric_alarm" "container_insights_node_disk" {
   tags = var.tags
 }
 
+# DynamoDB Connection Pool Utilization Alarm
+resource "aws_cloudwatch_metric_alarm" "db_connection_utilization" {
+  alarm_name          = "${var.cluster_name}-db-connection-utilization"
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = 2
+  metric_name         = "ConnectionPoolUtilization"
+  namespace           = "Custom/Database"
+  period              = 60
+  statistic           = "Average"
+  threshold           = var.db_connection_utilization_threshold
+  alarm_description   = "This metric monitors database connection pool utilization"
+  alarm_actions       = var.alarm_actions
+  ok_actions          = var.ok_actions
+  
+  dimensions = {
+    Service = "pet-service"
+  }
+  
+  tags = var.tags
+}
+
+# DynamoDB Operation Latency Alarm
+resource "aws_cloudwatch_metric_alarm" "db_operation_latency" {
+  alarm_name          = "${var.cluster_name}-db-operation-latency"
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = 2
+  metric_name         = "SuccessfulRequestLatency"
+  namespace           = "AWS/DynamoDB"
+  period              = 60
+  statistic           = "Average"
+  threshold           = var.db_operation_latency_threshold
+  alarm_description   = "This metric monitors database operation latency"
+  alarm_actions       = var.alarm_actions
+  ok_actions          = var.ok_actions
+  
+  dimensions = {
+    TableName = "${var.prefix}-pets"
+    Operation = "GetItem"
+  }
+  
+  tags = var.tags
+}
+
+# DynamoDB Throttled Requests Alarm
+resource "aws_cloudwatch_metric_alarm" "db_throttled_requests" {
+  alarm_name          = "${var.cluster_name}-db-throttled-requests"
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = 2
+  metric_name         = "ThrottledRequests"
+  namespace           = "AWS/DynamoDB"
+  period              = 60
+  statistic           = "Sum"
+  threshold           = var.db_throttled_requests_threshold
+  alarm_description   = "This metric monitors database throttled requests"
+  alarm_actions       = var.alarm_actions
+  ok_actions          = var.ok_actions
+  
+  dimensions = {
+    TableName = "${var.prefix}-pets"
+  }
+  
+  tags = var.tags
+}
 # Container Insights - Node Network Utilization Alarm
 resource "aws_cloudwatch_metric_alarm" "container_insights_node_network" {
   alarm_name          = "${var.cluster_name}-node-network-utilization"
@@ -271,6 +571,96 @@ resource "aws_cloudwatch_metric_alarm" "container_insights_node_network" {
   
   dimensions = {
     ClusterName = var.cluster_name
+  }
+  
+  tags = var.tags
+}
+
+# Cache Hit Rate Alarm
+resource "aws_cloudwatch_metric_alarm" "cache_hit_rate" {
+  alarm_name          = "${var.cluster_name}-cache-hit-rate"
+  comparison_operator = "LessThanThreshold"
+  evaluation_periods  = 3
+  metric_name         = "CacheHitRate"
+  namespace           = "Custom/Cache"
+  period              = 60
+  statistic           = "Average"
+  threshold           = var.cache_hit_rate_threshold
+  alarm_description   = "This metric monitors cache hit rate"
+  alarm_actions       = var.alarm_actions
+  ok_actions          = var.ok_actions
+  
+  dimensions = {
+    ClusterName = var.cluster_name
+    CacheId     = "${var.prefix}-cache"
+  }
+  
+  tags = var.tags
+}
+
+# Cache Latency Alarm
+resource "aws_cloudwatch_metric_alarm" "cache_latency" {
+  alarm_name          = "${var.cluster_name}-cache-latency"
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = 3
+  metric_name         = "CacheLatency"
+  namespace           = "Custom/Cache"
+  period              = 60
+  statistic           = "Average"
+  threshold           = var.cache_latency_threshold
+  alarm_description   = "This metric monitors cache operation latency"
+  alarm_actions       = var.alarm_actions
+  ok_actions          = var.ok_actions
+  
+  dimensions = {
+    ClusterName = var.cluster_name
+    CacheId     = "${var.prefix}-cache"
+  }
+  
+  tags = var.tags
+}
+
+# Cache Health Check Alarm
+resource "aws_cloudwatch_metric_alarm" "cache_health" {
+  alarm_name          = "${var.cluster_name}-cache-health"
+  comparison_operator = "GreaterThanOrEqualToThreshold"
+  evaluation_periods  = 1
+  metric_name         = "CacheHealthCheckFailures"
+  namespace           = "Custom/Cache"
+  period              = 60
+  statistic           = "Maximum"
+  threshold           = var.cache_health_check_threshold
+  alarm_description   = "This metric monitors cache health check failures"
+  alarm_actions       = var.alarm_actions
+  ok_actions          = var.ok_actions
+  
+  dimensions = {
+    ClusterName = var.cluster_name
+    CacheId     = "${var.prefix}-cache"
+  }
+  
+  treat_missing_data = "breaching"
+  
+  tags = var.tags
+}
+
+# Cache Eviction Rate Alarm
+resource "aws_cloudwatch_metric_alarm" "cache_eviction_rate" {
+  alarm_name          = "${var.cluster_name}-cache-eviction-rate"
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = 3
+  metric_name         = "CacheEvictionRate"
+  namespace           = "Custom/Cache"
+  period              = 60
+  statistic           = "Average"
+  threshold           = 100 # 100 evictions per minute
+  alarm_description   = "This metric monitors cache eviction rate"
+  alarm_actions       = var.alarm_actions
+  ok_actions          = var.ok_actions
+  
+  dimensions = {
+    ClusterName = var.cluster_name
+    CacheId     = "${var.prefix}-cache"
   }
   
   tags = var.tags
