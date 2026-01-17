@@ -24,6 +24,44 @@ const port = process.env.PORT || 3000;
 app.use(cors());
 app.use(bodyParser.json());
 
+// Health check endpoint
+app.get('/health', (req, res) => {
+  res.status(200).json({
+    status: 'healthy',
+    service: 'hospital-service',
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime()
+  });
+});
+
+// Readiness check endpoint
+app.get('/ready', (req, res) => {
+  res.status(200).json({
+    status: 'ready',
+    service: 'hospital-service',
+    timestamp: new Date().toISOString()
+  });
+});
+
+// Metrics endpoint
+app.get('/metrics', (req, res) => {
+  const memUsage = process.memoryUsage();
+  res.status(200).json({
+    service: 'hospital-service',
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+    memory: {
+      rss: memUsage.rss,
+      heapTotal: memUsage.heapTotal,
+      heapUsed: memUsage.heapUsed,
+      external: memUsage.external
+    },
+    cpu: process.cpuUsage(),
+    version: process.version,
+    platform: process.platform
+  });
+});
+
 // Request logging middleware
 app.use((req, res, next) => {
   const start = Date.now();
